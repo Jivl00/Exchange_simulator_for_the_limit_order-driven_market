@@ -1,0 +1,137 @@
+import pandas as pd
+from collections import deque
+from order import Order
+
+
+class OrderBook:
+    def __init__(self):
+        self.bids = {}  # Key: Price, Value: deque of Orders (bid side)
+        self.asks = {}  # Key: Price, Value: deque of Orders (ask side)
+        self.order_map = {}  # Key: Order ID, Value: (Order, Price level in bids/asks)
+
+        self.side_map = {  # Map side to price level
+            'buy': self.bids,
+            'sell': self.asks
+        }
+
+    def reset_book(self):
+        """Reset the order book."""
+        self.bids = {}
+        self.asks = {}
+        self.order_map = {}
+
+    def add_order(self, order):
+        """Add a new order to the order book."""
+
+        price_level = self.side_map[order.side]  # Bids or asks
+        if order.price not in price_level:
+            price_level[order.price] = deque()  # Initialize deque for the price level
+        price_level[order.price].append(order)
+
+        # Keep track of orders
+        self.order_map[order.id] = order
+
+    def remove_order(self, order_id):
+        """Remove an order from the order book."""
+        if order_id not in self.order_map:
+            print(f"Order {order_id} not found in the order book.")
+            return
+        # Remove the order from the order map
+        order = self.order_map[order_id]
+        del self.order_map[order_id]
+
+        # Remove the order from the bids or asks
+        price_level = self.side_map[order.side]
+        price_level[order.price].remove(order)
+        if not price_level[order.price]:  # Remove the price level if it's empty - no orders at that price
+            del price_level[order.price]
+
+    def modify_order_qty(self, order_id, new_quantity=None):
+        """
+        Modify an existing order in the order book - quantity decrease only.
+
+        This transaction does not make the order lose its price-time
+        priority in the queue, if the price is not modified and the
+        quantity is decreased.
+
+        For quantity increase or price modification, remove the order
+        and re-added it to the order book - modify_order() method.
+        """
+        if order_id not in self.order_map:
+            print(f"Order {order_id} not found in the order book.")
+            return
+
+        order = self.order_map[order_id]
+
+        if new_quantity is not None and new_quantity < order.quantity:
+            print(f"Decreasing the quantity of Order {order_id} from {order.quantity} to {new_quantity}.")
+            order.quantity = new_quantity
+        else:
+            print(f"For quantity increase use modify_order() method.")
+        return
+
+    def modify_order(self, order_id, timestamp, new_price=None, new_quantity=None):
+        """
+        Modify an existing order in the order book.
+
+        This transaction makes the order lose its price-time priority
+        in the queue. The order is removed and re-added to the order book.
+
+        For quantity decrease only, use modify_order_qty() method which
+        preserves the price-time priority.
+        """
+        if order_id not in self.order_map:
+            print(f"Order {order_id} not found in the order book.")
+            return
+
+        order = self.order_map[order_id]
+
+        # Remove the order
+        self.remove_order(order_id)
+
+        # Modify the order
+        if new_price is not None:
+            order.price = new_price
+        if new_quantity is not None:
+            order.quantity = new_quantity
+
+        # Re-add the order
+        self.add_order(order._replace(timestamp=timestamp))
+
+    def get_best_bid(self):
+        """Get the best bid price and quantity."""
+        if not self.bids:
+            return None
+        best_price = max(self.bids.keys())
+        best_order = self.bids[best_price][0]
+        return best_order
+
+    def get_best_ask(self):
+        """Get the best ask price and quantity."""
+        if not self.asks:
+            return None
+        best_price = min(self.asks.keys())
+        best_order = self.asks[best_price][0]
+        return best_order
+
+    def display_order_book(self):
+        """Display the order book."""
+        bids_df = pd.DataFrame(columns=['ID', 'Price', 'Quantity'])
+        asks_df = pd.DataFrame(columns=['ID', 'Price', 'Quantity'])
+        for price, orders in self.bids.items():
+            for order in orders:
+                bids_df = pd.concat(
+                    [bids_df, pd.DataFrame([{'ID': order.id, 'Price': price, 'Quantity': order.quantity}])],
+                    ignore_index=True)
+        for price, orders in self.asks.items():
+            for order in orders:
+                asks_df = pd.concat(
+                    [asks_df, pd.DataFrame([{'ID': order.id, 'Price': price, 'Quantity': order.quantity}])],
+                    ignore_index=True)
+
+        # Concatenate bids and asks DataFrames side by side
+        order_book_df = pd.concat([bids_df, asks_df], axis=1, keys=['Bids', 'Asks'])
+
+        # Print the concatenated DataFrame
+        # print(order_book_df.fillna('').to_markdown(index=False))
+        print(order_book_df.fillna('').to_string(index=False))
