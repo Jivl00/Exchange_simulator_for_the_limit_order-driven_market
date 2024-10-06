@@ -1,6 +1,6 @@
 import pandas as pd
 from collections import deque
-from order import Order
+import logging
 
 
 class OrderBook:
@@ -15,14 +15,19 @@ class OrderBook:
         }
 
     def reset_book(self):
-        """Reset the order book."""
+        """Reset the order book to an empty state."""
         self.bids = {}
         self.asks = {}
         self.order_map = {}
 
+        self.side_map = {
+            'buy': self.bids,
+            'sell': self.asks
+        }
+        logging.debug("ORDERBOOK: Order book reset.")
+
     def add_order(self, order):
         """Add a new order to the order book."""
-
         price_level = self.side_map[order.side]  # Bids or asks
         if order.price not in price_level:
             price_level[order.price] = deque()  # Initialize deque for the price level
@@ -31,10 +36,12 @@ class OrderBook:
         # Keep track of orders
         self.order_map[order.id] = order
 
+        logging.debug(f"ORDERBOOK: Added Order {order.id} ({order.side}): {order.quantity} shares at ${order.price:.2f}")
+
     def remove_order(self, order_id):
         """Remove an order from the order book."""
         if order_id not in self.order_map:
-            print(f"Order {order_id} not found in the order book.")
+            logging.warning(f"ORDERBOOK: Order {order_id} not found in the order book.")
             return
         # Remove the order from the order map
         order = self.order_map[order_id]
@@ -45,6 +52,20 @@ class OrderBook:
         price_level[order.price].remove(order)
         if not price_level[order.price]:  # Remove the price level if it's empty - no orders at that price
             del price_level[order.price]
+
+        logging.debug(f"ORDERBOOK: Removed Order {order.id} ({order.side}): {order.quantity} shares at ${order.price:.2f}")
+
+    def remove_best_order(self, side, price):
+        """Remove the best order from the order book - using .popleft() method."""
+        if price not in self.side_map[side]:
+            logging.warning(f"ORDERBOOK: No orders found at price {price} on the {side} side.")
+            return
+        order = self.side_map[side][price][0]
+        del self.order_map[order.id]
+
+        self.side_map[side][price].popleft()
+        if not self.side_map[side][price]:  # Remove the price level if it's empty - no orders at that price
+            del self.side_map[side][price]
 
     def modify_order_qty(self, order_id, new_quantity=None):
         """
@@ -58,16 +79,16 @@ class OrderBook:
         and re-added it to the order book - modify_order() method.
         """
         if order_id not in self.order_map:
-            print(f"Order {order_id} not found in the order book.")
+            logging.warning(f"ORDERBOOK: Order {order_id} not found in the order book.")
             return
 
         order = self.order_map[order_id]
 
-        if new_quantity is not None and new_quantity < order.quantity:
-            print(f"Decreasing the quantity of Order {order_id} from {order.quantity} to {new_quantity}.")
+        if new_quantity is not None and new_quantity <= order.quantity:
+            logging.debug(f"ORDERBOOK: Decreasing the quantity of Order {order_id} from {order.quantity} to {new_quantity}.")
             order.quantity = new_quantity
         else:
-            print(f"For quantity increase use modify_order() method.")
+            logging.warning(f"ORDERBOOK: Quantity increase or price modification not supported in modify_order_qty().")
         return
 
     def modify_order(self, order_id, timestamp, new_price=None, new_quantity=None):
@@ -81,7 +102,7 @@ class OrderBook:
         preserves the price-time priority.
         """
         if order_id not in self.order_map:
-            print(f"Order {order_id} not found in the order book.")
+            logging.warning(f"ORDERBOOK: Order {order_id} not found in the order book.")
             return
 
         order = self.order_map[order_id]
@@ -98,21 +119,22 @@ class OrderBook:
         # Re-add the order
         self.add_order(order._replace(timestamp=timestamp))
 
+        logging.debug(f"ORDERBOOK: Modified Order {order_id} ({order.side}): {order.quantity} shares at ${order.price:.2f}")
+
     def get_best_bid(self):
-        """Get the best bid price and quantity."""
+        """Return the best bid price."""
         if not self.bids:
             return None
         best_price = max(self.bids.keys())
-        best_order = self.bids[best_price][0]
-        return best_order
+
+        return best_price
 
     def get_best_ask(self):
-        """Get the best ask price and quantity."""
+        """Get the best ask price."""
         if not self.asks:
             return None
         best_price = min(self.asks.keys())
-        best_order = self.asks[best_price][0]
-        return best_order
+        return best_price
 
     def display_order_book(self):
         """Display the order book."""
