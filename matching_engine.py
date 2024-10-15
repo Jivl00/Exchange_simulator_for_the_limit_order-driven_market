@@ -54,15 +54,13 @@ class FIFOMatchingEngine:
                 print("FULL MATCH")
                 logging.info(f"MATCH: Full match between order {new_order.id} and order {best_counter_order.id} at price {price}")
             elif best_counter_order.quantity == new_order.quantity: # Full match
-                self.order_book.remove_best_order(counter_side, price)
+                self.order_book.delete_best_order(counter_side, price)
                 new_order.quantity = 0
                 print("FULL MATCH")
                 logging.info(f"MATCH: Full match between order {new_order.id} and order {best_counter_order.id} at price {price}")
             else: # Partial match
                 new_order.quantity -= best_counter_order.quantity
-                print(counter_order_queue)
-                self.order_book.remove_best_order(counter_side, price)
-                print(counter_order_queue)
+                self.order_book.delete_best_order(counter_side, price)
                 print("PARTIAL MATCH")
                 logging.info(f"MATCH: Partial match between order {new_order.id} and order {best_counter_order.id} at price {price}")
 

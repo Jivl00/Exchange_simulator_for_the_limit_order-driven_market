@@ -37,6 +37,11 @@ def main():
     fifo_matching_engine.match_order(Order(5, 5, 'sell', 100, 10.0))
     order_book.display_order_book()
 
+    fifo_matching_engine.match_order(Order(55, 5, 'sell', 150, 10.0))
+    order_book.display_order_book()
+
+    print(order_book.jsonify_order_book())
+
 
 if __name__ == "__main__":
     main()
