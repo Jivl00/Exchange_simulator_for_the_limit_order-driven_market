@@ -142,20 +142,28 @@ class OrderBook:
         best_price = min(self.asks.keys())
         return best_price
 
+    def get_order_by_user(self, user_id):
+        """Get all orders by a user."""
+        user_orders = []
+        for order in self.order_map.values():
+            if order.user == user_id:
+                user_orders.append(order)
+        return user_orders
+
     def display_order_book(self):
         """Display the order book."""
-        bids_df = pd.DataFrame(columns=['ID', 'Price', 'Quantity'])
-        asks_df = pd.DataFrame(columns=['ID', 'Price', 'Quantity'])
+        bids_df = pd.DataFrame(columns=['ID', 'User', 'Quantity', 'Price'])
+        asks_df = pd.DataFrame(columns=['ID', 'User', 'Quantity', 'Price'])
         for price, orders in self.bids.items():
             for order in orders:
                 bids_df = pd.concat(
-                    [bids_df, pd.DataFrame([{'ID': order.id, 'Price': price, 'Quantity': order.quantity}])],
-                    ignore_index=True)
+                    [bids_df, pd.DataFrame([{'ID': order.id, 'User': order.user, 'Quantity': order.quantity,
+                                             'Price': price}])], ignore_index=True)
         for price, orders in self.asks.items():
             for order in orders:
                 asks_df = pd.concat(
-                    [asks_df, pd.DataFrame([{'ID': order.id, 'Price': price, 'Quantity': order.quantity}])],
-                    ignore_index=True)
+                    [asks_df, pd.DataFrame([{'ID': order.id, 'User': order.user, 'Quantity': order.quantity,
+                                             'Price': price}])], ignore_index=True)
 
         # Concatenate bids and asks DataFrames side by side
         order_book_df = pd.concat([bids_df, asks_df], axis=1, keys=['Bids', 'Asks'])
@@ -170,10 +178,10 @@ class OrderBook:
         asks = []
         for price, orders in self.bids.items():
             for order in orders:
-                bids.append({'ID': order.id, 'Price': price, 'Quantity': order.quantity})
+                bids.append({'ID': order.id, 'User': order.user, 'Quantity': order.quantity, 'Price': price})
         for price, orders in self.asks.items():
             for order in orders:
-                asks.append({'ID': order.id, 'Price': price, 'Quantity': order.quantity})
+                asks.append({'ID': order.id, 'User': order.user, 'Quantity': order.quantity, 'Price': price})
 
         order_book_data = {
             'Bids': bids,
