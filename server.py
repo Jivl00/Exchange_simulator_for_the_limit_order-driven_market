@@ -17,7 +17,7 @@ ID = 0
 
 class MainHandler(tornado.web.RequestHandler):
     def get(self):
-        self.write("Welcome to the trading server!")
+        self.render("index.html")
 
 class KeepAliveHandler(tornado.websocket.WebSocketHandler):
     def open(self):
@@ -82,7 +82,7 @@ def make_app():
         (r"/delete_order", DeleteOrderHandler),
         (r"/list_user_orders", ListUserOrdersHandler),
         (r"/display_order_book", DisplayOrderBookHandler),
-    ])
+    ], template_path="templates")
 
 if __name__ == "__main__":
     app = make_app()

@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Add Order Message</title>
+    <script>
+        var ws = new WebSocket("ws://localhost:8888/order_book_ws");
+        var count = 0;
+        ws.onopen = function() {
+            console.log("WebSocket connection established");
+        };
+
+        ws.onmessage = function(event) {
+            var data = JSON.parse(event.data);
+            var addOrderMessage = data.message;
+            var addOrderDiv = document.getElementById("addOrderMessage");
+            addOrderDiv.innerHTML = addOrderMessage;
+            count++;
+            console.log("Received " + count + " messages");
+        };
+
+        ws.onerror = function(error) {
+            console.error("WebSocket error:", error);
+        };
+
+        ws.onclose = function() {
+            console.log("WebSocket connection closed");
+        };
+    </script>
+</head>
+<body>
+    <h1>Add Order Message</h1>
+    <pre id="addOrderMessage"></pre>
+</body>
+</html>
