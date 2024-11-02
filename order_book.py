@@ -28,6 +28,10 @@ class OrderBook:
         }
         logging.debug("ORDERBOOK: Order book reset.")
 
+    def get_order_by_id(self, order_id):
+        """Get an order by its ID."""
+        return self.order_map.get(order_id, None) # Return None if order_id not found
+
     def add_order(self, order):
         """Add a new order to the order book."""
         price_level = self.side_map[order.side]  # Bids or asks
@@ -45,7 +49,7 @@ class OrderBook:
         """Delete an order from the order book."""
         if order_id not in self.order_map:
             logging.warning(f"ORDERBOOK: Order {order_id} not found in the order book.")
-            return
+            return False
         # Delete the order from the order map
         order = self.order_map[order_id]
         del self.order_map[order_id]
@@ -58,6 +62,7 @@ class OrderBook:
 
         logging.debug(
             f"ORDERBOOK: Deleted Order {order.id} ({order.side}): {order.quantity} shares at ${order.price:.2f}")
+        return True
 
     def delete_best_order(self, side, price):
         """Delete the best order from the order book - using .popleft() method."""
@@ -84,7 +89,7 @@ class OrderBook:
         """
         if order_id not in self.order_map:
             logging.warning(f"ORDERBOOK: Order {order_id} not found in the order book.")
-            return
+            return False
 
         order = self.order_map[order_id]
 
@@ -94,38 +99,37 @@ class OrderBook:
             order.quantity = new_quantity
         else:
             logging.warning(f"ORDERBOOK: Quantity increase or price modification not supported in modify_order_qty().")
-        return
+            return False
+        return True
 
-    def modify_order(self, order_id, timestamp, new_price=None, new_quantity=None):
-        """
-        Modify an existing order in the order book.
-
-        This transaction makes the order lose its price-time priority
-        in the queue. The order is deleted and re-added to the order book.
-
-        For quantity decrease only, use modify_order_qty() method which
-        preserves the price-time priority.
-        """
-        if order_id not in self.order_map:
-            logging.warning(f"ORDERBOOK: Order {order_id} not found in the order book.")
-            return
-
-        order = self.order_map[order_id]
-
-        # Delete the order
-        self.delete_order(order_id)
-
-        # Modify the order
-        if new_price is not None:
-            order.price = new_price
-        if new_quantity is not None:
-            order.quantity = new_quantity
-
-        # Re-add the order
-        self.add_order(order._replace(timestamp=timestamp))
-
-        logging.debug(
-            f"ORDERBOOK: Modified Order {order_id} ({order.side}): {order.quantity} shares at ${order.price:.2f}")
+    # def modify_order(self, order_id, timestamp, new_price=None, new_quantity=None):
+    #     """
+    #     Modify an existing order in the order book.
+    #
+    #     This transaction makes the order lose its price-time priority
+    #     in the queue. The order is deleted and re-added to the order book.
+    #
+    #     For quantity decrease only, use modify_order_qty() method which
+    #     preserves the price-time priority.
+    #     """
+    #     if order_id not in self.order_map:
+    #         logging.warning(f"ORDERBOOK: Order {order_id} not found in the order book.")
+    #         return
+    #
+    #     order = self.order_map[order_id]
+    #
+    #     # Delete the order
+    #     self.delete_order(order_id)
+    #     # Modify the order
+    #     if new_price is not None:
+    #         order.price = new_price
+    #     if new_quantity is not None:
+    #         order.quantity = new_quantity
+    #     # Re-add the order
+    #     self.add_order(order._replace(timestamp=timestamp))
+    #
+    #     logging.debug(
+    #         f"ORDERBOOK: Modified Order {order_id} ({order.side}): {order.quantity} shares at ${order.price:.2f}")
 
     def get_best_bid(self):
         """Return the best bid price."""

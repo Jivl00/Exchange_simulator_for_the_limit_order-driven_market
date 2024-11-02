@@ -12,6 +12,16 @@ class Order:
     def __eq__(self, other):
         return self.id == other.id
 
+    def __json__(self):
+        return {
+            "id": self.id,
+            "timestamp": self.timestamp,
+            "user": self.user,
+            "side": self.side,
+            "quantity": self.quantity,
+            "price": self.price
+        }
+
     def __repr__(self):
         return f"Order({self.id}, {self.timestamp}, {self.user}, {self.side}, {self.quantity}, {self.price})"
 
