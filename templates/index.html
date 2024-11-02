@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Order Book</title>
+    <style>
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        th, td {
+            border: 1px solid black;
+            padding: 8px;
+            text-align: left;
+        }
+        th {
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <h1>Order Book</h1>
+    <button onclick="displayOrderBook()">Display Order Book</button>
+    <button onclick="showAddOrderForm()">Add Order</button>
+    <button onclick="showModifyOrderForm()">Modify Order</button>
+    <button onclick="showDeleteOrderForm()">Delete Order</button>
+    <button onclick="showListUserOrdersForm()">List User Orders</button>
+    <div id="form-container"></div>
+    <table id="order-book-table">
+        <thead>
+            <tr>
+                <th onclick="sortTable(0)">ID</th>
+                <th onclick="sortTable(1)">User</th>
+                <th onclick="sortTable(2)">Side</th>
+                <th onclick="sortTable(3)">Quantity</th>
+                <th onclick="sortTable(4)">Price</th>
+            </tr>
+        </thead>
+        <tbody></tbody>
+    </table>
+    <script>
+        function displayOrderBook() {
+            fetch('/display_order_book')
+                .then(response => response.json())
+                .then(data => {
+                    const tableBody = document.querySelector('#order-book-table tbody');
+                    tableBody.innerHTML = '';
+                    data.Bids.forEach(order => {
+                        const row = tableBody.insertRow();
+                        row.insertCell(0).innerText = order.ID;
+                        row.insertCell(1).innerText = order.User;
+                        row.insertCell(2).innerText = 'Buy';
+                        row.insertCell(3).innerText = order.Quantity;
+                        row.insertCell(4).innerText = order.Price;
+                    });
+                    data.Asks.forEach(order => {
+                        const row = tableBody.insertRow();
+                        row.insertCell(0).innerText = order.ID;
+                        row.insertCell(1).innerText = order.User;
+                        row.insertCell(2).innerText = 'Sell';
+                        row.insertCell(3).innerText = order.Quantity;
+                        row.insertCell(4).innerText = order.Price;
+                    });
+                });
+        }
+
+        function sortTable(columnIndex) {
+            const table = document.getElementById('order-book-table');
+            const rows = Array.from(table.rows).slice(1);
+            const sortedRows = rows.sort((a, b) => {
+                const aText = a.cells[columnIndex].innerText;
+                const bText = b.cells[columnIndex].innerText;
+                return aText.localeCompare(bText, undefined, {numeric: true});
+            });
+            const tableBody = table.querySelector('tbody');
+            tableBody.innerHTML = '';
+            sortedRows.forEach(row => tableBody.appendChild(row));
+        }
+
+        function showAddOrderForm() {
+            document.getElementById('form-container').innerHTML = `
+                <h2>Add Order</h2>
+                <form onsubmit="addOrder(event)">
+                    <label>User: <input type="text" id="add-user"></label><br>
+                    <label>Side: <input type="text" id="add-side"></label><br>
+                    <label>Quantity: <input type="number" id="add-quantity"></label><br>
+                    <label>Price: <input type="number" id="add-price"></label><br>
+                    <button type="submit">Add Order</button>
+                </form>
+            `;
+        }
+
+        function addOrder(event) {
+            event.preventDefault();
+            const user = document.getElementById('add-user').value;
+            const side = document.getElementById('add-side').value;
+            const quantity = document.getElementById('add-quantity').value;
+            const price = document.getElementById('add-price').value;
+            fetch('/add_order', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({user, side, quantity: Number(quantity), price: Number(price)})
+            }).then(response => response.json())
+              .then(data => alert(data.message));
+        }
+
+        // Similar functions for modifyOrder, deleteOrder, and listUserOrders can be added here
+    </script>
+</body>
+</html>

@@ -22,7 +22,7 @@ def setup_logger(logger_name, log_file, level=logging.DEBUG):
 
 
 # Logger
-setup_logger('logfix', 'Logs/message.log')
+setup_logger('logfix', 'logs/message.log')
 logfix = logging.getLogger('logfix')
 
 
