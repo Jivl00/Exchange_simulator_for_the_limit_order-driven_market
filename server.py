@@ -23,31 +23,6 @@ class MainHandler(tornado.web.RequestHandler):
         self.render("index.html")
 
 
-class KeepAliveHandler(tornado.websocket.WebSocketHandler):
-    def open(self):
-        self.write_message("Connection established")
-
-    def on_message(self, message):
-        self.write_message("Message received")
-
-    def on_close(self):
-        self.write_message("Connection closed")
-
-
-class ListUserOrdersHandler(tornado.web.RequestHandler):
-    def get(self):
-        user = self.get_argument('user')
-        orders = order_book.get_orders_by_user(user)
-        orders = {order.id: order.__str__() for order in orders}
-        self.write(orders)
-
-
-class DisplayOrderBookHandler(tornado.web.RequestHandler):
-    def get(self):
-        order_book_data = order_book.jsonify_order_book()  # Assuming this method returns the order book data as a dictionary
-        self.write(order_book_data)
-
-
 def make_order(data):
     """
     Create an order object from the FIX message
@@ -152,7 +127,13 @@ class QuoteHandler(tornado.web.RequestHandler):
         order_book_data = order_book.jsonify_order_book()
         self.write(order_book_data)
 
-    msg_type_handlers = {b"H": order_stats, b"V": market_data}
+    def user_data(self, data):
+        user = data.get(49).decode()
+        orders = order_book.get_orders_by_user(user)
+        orders = {order.id: order.__json__() for order in orders}
+        self.write(orders)
+
+    msg_type_handlers = {b"H": order_stats, b"V": market_data, b"AF": user_data}
 
     def get(self):
         data = json.loads(self.request.body)
@@ -168,9 +149,6 @@ class QuoteHandler(tornado.web.RequestHandler):
 def make_app():
     return tornado.web.Application([
         (r"/", MainHandler),
-        (r"/keep_alive", KeepAliveHandler),
-        (r"/list_user_orders", ListUserOrdersHandler),
-        (r"/display_order_book", DisplayOrderBookHandler),
         (r"/trade", TradeHandler),
         (r"/quote", QuoteHandler),
     ], template_path="templates")

@@ -135,28 +135,42 @@ class Initiator:
 
     def order_book_request(self, depth=0):
         """
-        Display the order book from the FIX server.
+        Returns the order book from the FIX server.
         :param depth: Market depth (0 = full book)
         :return: JSON with order book data
         """
         message = self.fix_message_init()
         message.append_pair(35, "V", header=True)  # MsgType = MarketDataRequest
-        message.append_pair(262, 1)  # MDReqID
         message.append_pair(263, 0)  # SubscriptionRequestType = Snapshot
         message.append_pair(264, depth)  # MarketDepth
 
         byte_buffer = message.encode()
         response = requests.get(f"{self.BASE_URL}/{self.QUOTE_SESSION}", json={"message": byte_buffer})
-        print(response.json())
 
-    def list_user_orders(self, user):
-        response = requests.get(f"{BASE_URL}/list_user_orders?user={user}")
-        print(response.json())
-
-    def display_order_book2(self):
-        response = requests.get(f"{BASE_URL}/display_order_book")
         order_book_data = response.json()
 
+        return order_book_data
+
+    def list_user_orders(self):
+        """
+        Returns a list of orders for a specific user.
+        :return: JSON with order data
+        """
+        message = self.fix_message_init()
+        message.append_pair(35, "AF", header=True)  # MsgType = OrderMassStatusRequest
+        message.append_pair(585, 8)  # MassStatusReqType = Status for orders for a PartyID
+        message.append_pair(448, self.SENDER.split('=')[1])  # PartyID
+
+        byte_buffer = message.encode()
+        response = requests.get(f"{self.BASE_URL}/{self.QUOTE_SESSION}", json={"message": byte_buffer})
+        print(response.json())
+
+    def display_order_book(self, order_book_data):
+        """
+        Display the order book in a human-readable format. For debugging purposes.
+        :param order_book_data: JSON with order book data
+        :return: None
+        """
         bids_df = pd.DataFrame(order_book_data['Bids'])
         asks_df = pd.DataFrame(order_book_data['Asks'])
 
