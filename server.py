@@ -37,7 +37,7 @@ class KeepAliveHandler(tornado.websocket.WebSocketHandler):
 class ListUserOrdersHandler(tornado.web.RequestHandler):
     def get(self):
         user = self.get_argument('user')
-        orders = order_book.get_order_by_user(user)
+        orders = order_book.get_orders_by_user(user)
         orders = {order.id: order.__str__() for order in orders}
         self.write(orders)
 
@@ -148,7 +148,21 @@ class QuoteHandler(tornado.web.RequestHandler):
         else:
             self.write({"message": "Order not found"})
 
-    # def
+    def market_data(self, data):
+        order_book_data = order_book.jsonify_order_book()
+        self.write(order_book_data)
+
+    msg_type_handlers = {b"H": order_stats, b"V": market_data}
+
+    def get(self):
+        data = json.loads(self.request.body)
+        message = data['message']
+        self.parser.append_buffer(message)
+        message = self.parser.get_message()
+        logging.info(f"Received message: {message}")
+
+        msg_type_handler = self.msg_type_handlers[message.get(35)]
+        msg_type_handler(self, message)
 
 
 def make_app():

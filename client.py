@@ -13,7 +13,17 @@ MSG_SEQ_NUM = 0
 
 
 class Initiator:
+    """
+    FIX client class for communicating with the FIX server.
+    """
+
     def __init__(self, sender, target, config):
+        """
+        Initialize the FIX client.
+        :param sender: Sender ID (Client ID)
+        :param target: Target ID (Server ID)
+        :param config: Configuration dictionary with server details, e.g. HOST, PORT, TRADING_SESSION, QUOTE_SESSION, FIX_VERSION
+        """
         self.BASE_URL = f"{config['HOST']}:{config['PORT']}"
         self.TRADING_SESSION = config["TRADING_SESSION"]
         self.QUOTE_SESSION = config["QUOTE_SESSION"]
@@ -26,7 +36,7 @@ class Initiator:
 
     def fix_message_init(self):
         """
-        Initialize a FIX message with standard header tags
+        Initialize a FIX message with standard header tags.
         :return: simplefix.FixMessage object
         """
         message = simplefix.FixMessage()
@@ -40,7 +50,7 @@ class Initiator:
 
     def order_stats(self, ID):
         """
-        Request order status from the FIX server
+        Request order status from the FIX server.
         :param ID: Order ID
         :return: JSON with order details (id, timestamp, user, side, quantity, price) if found, None otherwise
         """
@@ -59,7 +69,7 @@ class Initiator:
 
     def put_order(self, order):
         """
-        Send a new order request to the FIX server
+        Send a new order request to the FIX server.
         :param order: Dictionary containing order details
         :return: Order ID if not fully filled, None otherwise
         """
@@ -76,7 +86,7 @@ class Initiator:
 
     def delete_order(self, ID):
         """
-        Send an order cancel request to the FIX server
+        Send an order cancel request to the FIX server.
         :param ID: Order ID
         :return: None
         """
@@ -90,7 +100,7 @@ class Initiator:
 
     def modify_order_qty(self, ID, quantity):
         """
-        Modify order quantity - only decrease is allowed
+        Modify order quantity - only decrease is allowed.
         :param ID: Order ID
         :param quantity: New quantity
         :return: None
@@ -106,7 +116,7 @@ class Initiator:
 
     def modify_order(self, ID, new_price=None, new_quantity=None):
         """
-        Modify an existing order - price and/or quantity
+        Modify an existing order - price and/or quantity.
         :param ID: Order ID
         :param new_price: New price (or None)
         :param new_quantity: New quantity (or None)
@@ -123,15 +133,17 @@ class Initiator:
             order['quantity'] = new_quantity
         return self.put_order(order)
 
-    def order_book_request(self):
+    def order_book_request(self, depth=0):
         """
-        Display the order book from the FIX server
-        :return: None
+        Display the order book from the FIX server.
+        :param depth: Market depth (0 = full book)
+        :return: JSON with order book data
         """
         message = self.fix_message_init()
-        message.append_pair(35,"V", header=True)  # MsgType = MarketDataRequest
-        message.append_pair(263, 1)  # SubscriptionRequestType = Snapshot
-        message.append_pair(264, 0)  # MarketDepth = Full Book
+        message.append_pair(35, "V", header=True)  # MsgType = MarketDataRequest
+        message.append_pair(262, 1)  # MDReqID
+        message.append_pair(263, 0)  # SubscriptionRequestType = Snapshot
+        message.append_pair(264, depth)  # MarketDepth
 
         byte_buffer = message.encode()
         response = requests.get(f"{self.BASE_URL}/{self.QUOTE_SESSION}", json={"message": byte_buffer})

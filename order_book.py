@@ -189,7 +189,7 @@ class OrderBook:
         best_price = self.asks.peekitem(0)[0]  # get min price
         return best_price
 
-    def get_order_by_user(self, user_id):
+    def get_orders_by_user(self, user_id):
         """
         Get all orders by a user.
         :param user_id: User ID
@@ -207,30 +207,12 @@ class OrderBook:
     -------------------------------
     """
 
-    def display_order_book(self):
-        """Display the order book."""
-        bids_df = pd.DataFrame(columns=['ID', 'User', 'Quantity', 'Price'])
-        asks_df = pd.DataFrame(columns=['ID', 'User', 'Quantity', 'Price'])
-        for price, orders in self.bids.items():
-            for order in orders:
-                bids_df = pd.concat(
-                    [bids_df, pd.DataFrame([{'ID': order.id, 'User': order.user, 'Quantity': order.quantity,
-                                             'Price': price}])], ignore_index=True)
-        for price, orders in self.asks.items():
-            for order in orders:
-                asks_df = pd.concat(
-                    [asks_df, pd.DataFrame([{'ID': order.id, 'User': order.user, 'Quantity': order.quantity,
-                                             'Price': price}])], ignore_index=True)
-
-        # Concatenate bids and asks DataFrames side by side
-        order_book_df = pd.concat([bids_df, asks_df], axis=1, keys=['Bids', 'Asks'])
-
-        # Print the concatenated DataFrame
-        # print(order_book_df.fillna('').to_markdown(index=False))
-        print(order_book_df.fillna('').to_string(index=False))
-
     def jsonify_order_book(self, depth=-1):
-        """Display the order book with a specified depth."""
+        """
+        Display the order book with a specified depth.
+        :param depth: Depth of the order book (N price tiers of data) (default: -1 for full order book)
+        :return: JSON string of the order book
+        """
         bids = []
         asks = []
 
@@ -238,14 +220,14 @@ class OrderBook:
         for price, orders in reversed(self.bids.items()):
             for order in orders:
                 bids.append({'ID': order.id, 'User': order.user, 'Quantity': order.quantity, 'Price': price})
-            if depth > 0 and len(bids) >= depth:
+            if 0 < depth <= len(bids):
                 break
 
         # Get the best (depth) ask prices
         for price, orders in self.asks.items():
             for order in orders:
                 asks.append({'ID': order.id, 'User': order.user, 'Quantity': order.quantity, 'Price': price})
-            if depth > 0 and len(asks) >= depth:
+            if 0 < depth <= len(asks):
                 break
 
         order_book_data = {
@@ -254,3 +236,33 @@ class OrderBook:
         }
 
         return json.dumps(order_book_data)
+
+
+"""
+-------------------------------
+Might be useful for debugging
+-------------------------------
+"""
+
+
+def display_order_book(self):
+    """Display the order book."""
+    bids_df = pd.DataFrame(columns=['ID', 'User', 'Quantity', 'Price'])
+    asks_df = pd.DataFrame(columns=['ID', 'User', 'Quantity', 'Price'])
+    for price, orders in self.bids.items():
+        for order in orders:
+            bids_df = pd.concat(
+                [bids_df, pd.DataFrame([{'ID': order.id, 'User': order.user, 'Quantity': order.quantity,
+                                         'Price': price}])], ignore_index=True)
+    for price, orders in self.asks.items():
+        for order in orders:
+            asks_df = pd.concat(
+                [asks_df, pd.DataFrame([{'ID': order.id, 'User': order.user, 'Quantity': order.quantity,
+                                         'Price': price}])], ignore_index=True)
+
+    # Concatenate bids and asks DataFrames side by side
+    order_book_df = pd.concat([bids_df, asks_df], axis=1, keys=['Bids', 'Asks'])
+
+    # Print the concatenated DataFrame
+    # print(order_book_df.fillna('').to_markdown(index=False))
+    print(order_book_df.fillna('').to_string(index=False))

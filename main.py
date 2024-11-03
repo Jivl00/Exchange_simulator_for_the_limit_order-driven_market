@@ -18,7 +18,7 @@ def main():
     order_book.add_order(Order(2.1, 2, 'pepa', 'sell', 100, 30.0))
     order_book.add_order(Order(3, 2, 'pepa', 'sell', 100, 25.0))
     order_book.display_order_book()
-    print(order_book.get_order_by_user('pepa'))
+    print(order_book.get_orders_by_user('pepa'))
 
     order_book.modify_order_qty(1, new_quantity=50)
     order_book.display_order_book()
