@@ -12,15 +12,13 @@ import simplefix
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 # TODO log outcoming messages as debug
 
-# Initialize an empty order book and matching engine
-order_book = OrderBook()
-fifo_matching_engine = FIFOMatchingEngine(order_book)
+config = json.load(open("config/fix_config.json"))
+BEGIN_STRING = config["FIX_VERSION"]
+MSG_SEQ_NUM = 0
 ID = 0
 
-
-class MainHandler(tornado.web.RequestHandler):
-    def get(self):
-        self.render("index.html")
+order_book = OrderBook()
+fifo_matching_engine = FIFOMatchingEngine(order_book)
 
 
 def make_order(data):
@@ -47,18 +45,67 @@ def make_order(data):
     ID += 1
     return order
 
+def parse_message(request):
+    """
+    Parse the incoming FIX message.
+    :param request: FIX message
+    :return: Decoded message
+    """
+    parser = simplefix.FixParser()
+    data = json.loads(request.body)
+    message = data['message']
+    parser.append_buffer(message)
+    message = parser.get_message()
+    logging.info(f"R>: {message}")
+    return message
+
+def fix_message_init(TARGET):
+    """
+    Initialize a FIX message with standard header tags.
+    :param TARGET: Target ID
+    :return: simplefix.FixMessage object
+    """
+    global MSG_SEQ_NUM
+    message = simplefix.FixMessage()
+    message.append_string(BEGIN_STRING, header=True)
+    message.append_pair(56, TARGET, header=True)
+    message.append_string("49=server", header=True)
+    message.append_utc_timestamp(52, precision=6, header=True)
+    message.append_pair(34, MSG_SEQ_NUM, header=True)
+    MSG_SEQ_NUM += 1
+    return message
+
+
+class MainHandler(tornado.web.RequestHandler):
+    """
+    Main handler for the web server.
+    """
+    def get(self):
+        self.render("index.html")
+
 
 class TradeHandler(tornado.web.RequestHandler):
+    """
+    Handler for trading-related requests.
+    """
     # TODO fix message response to client
-    parser = simplefix.FixParser()
 
     def order_stats(self, data):
         order_id = data.get(41).decode()
         order = order_book.get_order_by_id(order_id)
+        message = fix_message_init(data.get(49).decode())
         if order:
-            self.write({"order": order.__json__()})
+            order = order.__json__()
+            message.append_pair(35, "8")  # OrdStatus = New
+            message.append_pair(39, "1")  # OrdStatus = Remaining (partially filled) quantity
+            message.append_pair(37, order['id']) # OrderID
+            message.append_pair(54, 1 if order['side'] == 'buy' else 2) # Side
+            message.append_pair(151, order['quantity']) # LeavesQty
+            message.append_pair(44, order['price']) # Price
         else:
-            self.write({"message": "Order not found"})
+            message.append_pair(39, "8")  # OrdStatus = Rejected
+        byte_buffer = message.encode()
+        self.write({"message": byte_buffer.decode()})
 
     def match_order(self, data):
         order = make_order(data)
@@ -92,28 +139,19 @@ class TradeHandler(tornado.web.RequestHandler):
     msg_type_handlers = {b"D": match_order, b"F": delete_order, b"G": modify_order_qty, b"H": order_stats}
 
     def post(self):
-        data = json.loads(self.request.body)
-        message = data['message']
-        self.parser.append_buffer(message)
-        message = self.parser.get_message()
-        logging.info(f"Received message: {message}")
+        message = parse_message(self.request)
 
         msg_type_handler = self.msg_type_handlers[message.get(35)]
         msg_type_handler(self, message)
 
     def get(self):
-        data = json.loads(self.request.body)
-        message = data['message']
-        self.parser.append_buffer(message)
-        message = self.parser.get_message()
-        logging.info(f"Received message: {message}")
+        message = parse_message(self.request)
 
         msg_type_handler = self.msg_type_handlers[message.get(35)]
         msg_type_handler(self, message)
 
 
 class QuoteHandler(tornado.web.RequestHandler):
-    parser = simplefix.FixParser()
 
     def order_stats(self, data):
         order_id = data.get(41).decode()
@@ -136,11 +174,7 @@ class QuoteHandler(tornado.web.RequestHandler):
     msg_type_handlers = {b"H": order_stats, b"V": market_data, b"AF": user_data}
 
     def get(self):
-        data = json.loads(self.request.body)
-        message = data['message']
-        self.parser.append_buffer(message)
-        message = self.parser.get_message()
-        logging.info(f"Received message: {message}")
+        message = parse_message(self.request)
 
         msg_type_handler = self.msg_type_handlers[message.get(35)]
         msg_type_handler(self, message)
@@ -149,12 +183,13 @@ class QuoteHandler(tornado.web.RequestHandler):
 def make_app():
     return tornado.web.Application([
         (r"/", MainHandler),
-        (r"/trade", TradeHandler),
-        (r"/quote", QuoteHandler),
+        (f"/{config['TRADING_SESSION']}", TradeHandler),
+        (f"/{config['QUOTE_SESSION']}", QuoteHandler)
     ], template_path="templates")
 
 
 if __name__ == "__main__":
     app = make_app()
-    app.listen(8888)
+    app.listen(config["PORT"], address=config["HOST"].replace("http://", ""))
+    print(f"Server started on {config['HOST']}:{config['PORT']}")
     tornado.ioloop.IOLoop.current().start()

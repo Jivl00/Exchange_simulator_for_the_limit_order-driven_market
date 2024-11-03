@@ -1,16 +1,6 @@
 import requests
-import json
 import pandas as pd
 import simplefix
-
-config = json.load(open("config/fix_config.json"))
-
-BASE_URL = "http://127.0.0.1:8888"
-BEGIN_STRING = config["FIX_VERSION"]
-TARGET = "56=server"
-SENDER = "49=fixer"
-MSG_SEQ_NUM = 0
-
 
 class Initiator:
     """
@@ -42,10 +32,22 @@ class Initiator:
         message = simplefix.FixMessage()
         message.append_string(self.BEGIN_STRING, header=True)
         message.append_string(self.TARGET, header=True)
+        message.append_string(self.SENDER, header=True)
         message.append_utc_timestamp(52, precision=6, header=True)
         message.append_pair(34, self.MSG_SEQ_NUM, header=True)
         self.MSG_SEQ_NUM += 1
-        message.append_string(self.SENDER, header=True)
+        return message
+
+    def parse_message(self, msg):
+        """
+        Parse the incoming FIX message.
+        :param msg: FIX message
+        :return: Decoded message
+        """
+        message = msg['message']
+        self.parser.append_buffer(message)
+        message = self.parser.get_message()
+        print(f"R>: {message}")
         return message
 
     def order_stats(self, ID):
@@ -60,10 +62,12 @@ class Initiator:
 
         byte_buffer = message.encode()
         response = requests.get(f"{self.BASE_URL}/{self.TRADING_SESSION}", json={"message": byte_buffer})
+
         response_data = response.json()
-        print(response.json())
-        if response_data.get('order', None):
-            order = response_data['order']
+        message = self.parse_message(response_data)
+        if message.get(39).decode() != '8': # OrderStatus != Rejected
+            order = {'id': message.get(37).decode(), 'side': 'buy' if message.get(54).decode() == '1' else 'sell',
+                     'quantity': int(message.get(151).decode()), 'price': float(message.get(44).decode())}
             return order
         return None
 
