@@ -2,13 +2,21 @@ import json
 
 import pandas as pd
 from collections import deque
+from sortedcontainers import SortedDict
 import logging
 
 
 class OrderBook:
+    """
+    Order book class to store and manage orders.
+    """
+
     def __init__(self):
-        self.bids = {}  # Key: Price, Value: deque of Orders (bid side)
-        self.asks = {}  # Key: Price, Value: deque of Orders (ask side)
+        """
+        Initialize an empty order book.
+        """
+        self.bids = SortedDict()  # Key: Price, Value: deque of Orders (bid side)
+        self.asks = SortedDict()  # Key: Price, Value: deque of Orders (ask side)
         self.order_map = {}  # Key: Order ID, Value: (Order, Price level in bids/asks)
 
         self.side_map = {  # Map side to price level
@@ -17,9 +25,11 @@ class OrderBook:
         }
 
     def reset_book(self):
-        """Reset the order book to an empty state."""
-        self.bids = {}
-        self.asks = {}
+        """
+        Reset the order book to an empty state.
+        """
+        self.bids = SortedDict()
+        self.asks = SortedDict()
         self.order_map = {}
 
         self.side_map = {
@@ -29,11 +39,19 @@ class OrderBook:
         logging.debug("ORDERBOOK: Order book reset.")
 
     def get_order_by_id(self, order_id):
-        """Get an order by its ID."""
-        return self.order_map.get(order_id, None) # Return None if order_id not found
+        """
+        Get an order by its ID.
+        :param order_id: Order ID
+        :return: Order object or None if not found
+        """
+        return self.order_map.get(order_id, None)  # Return None if order_id not found
 
     def add_order(self, order):
-        """Add a new order to the order book."""
+        """
+        Add a new order to the order book.
+        :param order: Order object
+        :return: None
+        """
         price_level = self.side_map[order.side]  # Bids or asks
         if order.price not in price_level:
             price_level[order.price] = deque()  # Initialize deque for the price level
@@ -46,7 +64,11 @@ class OrderBook:
             f"ORDERBOOK: Added Order {order.id} ({order.side}): {order.quantity} shares at ${order.price:.2f}")
 
     def delete_order(self, order_id):
-        """Delete an order from the order book."""
+        """
+        Delete an order from the order book.
+        :param order_id: Order ID
+        :return: True if the order was deleted, False otherwise
+        """
         if order_id not in self.order_map:
             logging.warning(f"ORDERBOOK: Order {order_id} not found in the order book.")
             return False
@@ -65,7 +87,12 @@ class OrderBook:
         return True
 
     def delete_best_order(self, side, price):
-        """Delete the best order from the order book - using .popleft() method."""
+        """
+        Delete the best order from the order book - using .popleft() method. For trading purposes only.
+        :param side: Order side ('buy' or 'sell')
+        :param price: Order price
+        :return: None
+        """
         if price not in self.side_map[side]:
             logging.warning(f"ORDERBOOK: No orders found at price {price} on the {side} side.")
             return
@@ -86,6 +113,10 @@ class OrderBook:
 
         For quantity increase or price modification, delete the order
         and re-added it to the order book - modify_order() method.
+
+        :param order_id: Order ID
+        :param new_quantity: New quantity (must be less than or equal to the original quantity)
+        :return: True if the order was modified, False otherwise
         """
         if order_id not in self.order_map:
             logging.warning(f"ORDERBOOK: Order {order_id} not found in the order book.")
@@ -102,52 +133,68 @@ class OrderBook:
             return False
         return True
 
-    # def modify_order(self, order_id, timestamp, new_price=None, new_quantity=None):
-    #     """
-    #     Modify an existing order in the order book.
-    #
-    #     This transaction makes the order lose its price-time priority
-    #     in the queue. The order is deleted and re-added to the order book.
-    #
-    #     For quantity decrease only, use modify_order_qty() method which
-    #     preserves the price-time priority.
-    #     """
-    #     if order_id not in self.order_map:
-    #         logging.warning(f"ORDERBOOK: Order {order_id} not found in the order book.")
-    #         return
-    #
-    #     order = self.order_map[order_id]
-    #
-    #     # Delete the order
-    #     self.delete_order(order_id)
-    #     # Modify the order
-    #     if new_price is not None:
-    #         order.price = new_price
-    #     if new_quantity is not None:
-    #         order.quantity = new_quantity
-    #     # Re-add the order
-    #     self.add_order(order._replace(timestamp=timestamp))
-    #
-    #     logging.debug(
-    #         f"ORDERBOOK: Modified Order {order_id} ({order.side}): {order.quantity} shares at ${order.price:.2f}")
+    def modify_order(self, order_id, timestamp, new_price=None, new_quantity=None):
+        """
+        Modify an existing order in the order book.
+
+        This transaction makes the order lose its price-time priority
+        in the queue. The order is deleted and re-added to the order book.
+
+        For quantity decrease only, use modify_order_qty() method which
+        preserves the price-time priority.
+
+        :param order_id: Order ID
+        :param timestamp: Timestamp of the modification
+        :param new_price: New price (or None)
+        :param new_quantity: New quantity (or None)
+        :return: None
+        """
+        if order_id not in self.order_map:
+            logging.warning(f"ORDERBOOK: Order {order_id} not found in the order book.")
+            return
+
+        order = self.order_map[order_id]
+
+        # Delete the order
+        self.delete_order(order_id)
+        # Modify the order
+        if new_price is not None:
+            order.price = new_price
+        if new_quantity is not None:
+            order.quantity = new_quantity
+        # Re-add the order
+        self.add_order(order._replace(timestamp=timestamp))
+
+        logging.debug(
+            f"ORDERBOOK: Modified Order {order_id} ({order.side}): {order.quantity} shares at ${order.price:.2f}")
 
     def get_best_bid(self):
-        """Return the best bid price."""
+        """
+        Return the best bid price. The best bid price is the highest price in the bids.
+        :return: Best bid price or None if no bids
+        """
         if not self.bids:
             return None
-        best_price = max(self.bids.keys())
+        best_price = self.bids.peekitem(-1)[0]  # get max price
 
         return best_price
 
     def get_best_ask(self):
-        """Get the best ask price."""
+        """
+        Get the best ask price. The best ask price is the lowest price in the asks.
+        :return: Best ask price or None if no asks
+        """
         if not self.asks:
             return None
-        best_price = min(self.asks.keys())
+        best_price = self.asks.peekitem(0)[0]  # get min price
         return best_price
 
     def get_order_by_user(self, user_id):
-        """Get all orders by a user."""
+        """
+        Get all orders by a user.
+        :param user_id: User ID
+        :return: List of orders by the user
+        """
         user_orders = []
         for order in self.order_map.values():
             if order.user == user_id:
@@ -159,6 +206,7 @@ class OrderBook:
     All display methods below are for non-aggregated order book display.
     -------------------------------
     """
+
     def display_order_book(self):
         """Display the order book."""
         bids_df = pd.DataFrame(columns=['ID', 'User', 'Quantity', 'Price'])
@@ -182,15 +230,23 @@ class OrderBook:
         print(order_book_df.fillna('').to_string(index=False))
 
     def jsonify_order_book(self, depth=-1):
-        """Display the order book."""
+        """Display the order book with a specified depth."""
         bids = []
         asks = []
-        for price, orders in sorted(self.bids.items(), reverse=True):
+
+        # Get the best (depth) bid prices
+        for price, orders in reversed(self.bids.items()):
             for order in orders:
                 bids.append({'ID': order.id, 'User': order.user, 'Quantity': order.quantity, 'Price': price})
-        for price, orders in sorted(self.asks.items()):
+            if depth > 0 and len(bids) >= depth:
+                break
+
+        # Get the best (depth) ask prices
+        for price, orders in self.asks.items():
             for order in orders:
                 asks.append({'ID': order.id, 'User': order.user, 'Quantity': order.quantity, 'Price': price})
+            if depth > 0 and len(asks) >= depth:
+                break
 
         order_book_data = {
             'Bids': bids,
