@@ -1,0 +1,31 @@
+from client import Initiator
+import json
+
+config = json.load(open("config/fix_config.json"))
+manual_agent = Initiator("manual_agent", "server", config)
+
+# put_order({"side": "buy", "quantity": 100, "price": 20.0, "user": "pepa"})
+# put_order({"side": "sell", "quantity": 50, "price": 30.0, "user": "pepa"})
+# put_order({"side": "buy", "quantity": 100, "price": 20.0, "user": "fixer"})
+# display_order_book()
+# order_stats(0)
+# delete_order(2)
+# modify_order_qty(0, 50)
+# display_order_book()
+# modify_order(1, new_price=25.0)
+# display_order_book()
+# put_order({"side": "sell", "quantity": 100, "price": 20.0, "user": "pepa"})
+# display_order_book()
+
+manual_agent.put_order({"side": "buy", "quantity": 100, "price": 20.0})
+manual_agent.put_order({"side": "sell", "quantity": 50, "price": 30.0})
+manual_agent.put_order({"side": "buy", "quantity": 100, "price": 20.0})
+manual_agent.display_order_book2()
+manual_agent.order_stats(0)
+manual_agent.delete_order(2)
+manual_agent.modify_order_qty(0, 50)
+manual_agent.display_order_book2()
+manual_agent.modify_order(1, new_price=25.0)
+manual_agent.display_order_book2()
+manual_agent.put_order({"side": "sell", "quantity": 100, "price": 20.0})
+manual_agent.display_order_book2()

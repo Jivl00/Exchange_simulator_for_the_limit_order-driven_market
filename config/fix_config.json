@@ -1,4 +1,7 @@
 {
-    "BEGIN_STRING": "8=FIX.4.4",
-    "TARGET": "56=SIMULATOR SERVER"
+    "FIX_VERSION": "8=FIX.4.4",
+    "PORT": 8888,
+    "HOST": "http://127.0.0.1",
+    "TRADING_SESSION": "fix",
+    "QUOTE_SESSION": "quote"
 }

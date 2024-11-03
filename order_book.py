@@ -154,6 +154,11 @@ class OrderBook:
                 user_orders.append(order)
         return user_orders
 
+    """
+    -------------------------------
+    All display methods below are for non-aggregated order book display.
+    -------------------------------
+    """
     def display_order_book(self):
         """Display the order book."""
         bids_df = pd.DataFrame(columns=['ID', 'User', 'Quantity', 'Price'])

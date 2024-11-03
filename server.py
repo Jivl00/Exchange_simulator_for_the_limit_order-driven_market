@@ -10,6 +10,7 @@ import time
 import simplefix
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+# TODO log outcoming messages as debug
 
 # Initialize an empty order book and matching engine
 order_book = OrderBook()
@@ -90,9 +91,14 @@ class FixHandler(tornado.web.RequestHandler):
 
     def match_order(self, data):
         order = make_order(data)
-        fifo_matching_engine.match_order(order)
-        # TODO print execution of the order, return ID of the order
-        self.write({"message": "Order added successfully"})
+        order_id = order.id
+        ret = fifo_matching_engine.match_order(order)
+        if ret is None:
+            self.write({"message": "Order fully matched", "status": "filled", "order_id": order_id})
+        elif ret is True:
+            self.write({"message": "Order partially matched", "status": "not filled", "order_id": order_id})
+        else:
+            self.write({"message": "Order match failed", "status": "failed", "order_id": order_id})
 
     def delete_order(self, data):
         order_id = data.get(41).decode()
