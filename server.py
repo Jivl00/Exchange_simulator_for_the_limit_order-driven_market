@@ -17,9 +17,11 @@ order_book = OrderBook()
 fifo_matching_engine = FIFOMatchingEngine(order_book)
 ID = 0
 
+
 class MainHandler(tornado.web.RequestHandler):
     def get(self):
         self.render("index.html")
+
 
 class KeepAliveHandler(tornado.websocket.WebSocketHandler):
     def open(self):
@@ -31,12 +33,6 @@ class KeepAliveHandler(tornado.websocket.WebSocketHandler):
     def on_close(self):
         self.write_message("Connection closed")
 
-class ModifyOrderHandler(tornado.web.RequestHandler):
-    def post(self):
-        data = json.loads(self.request.body)
-        timestamp = time.time_ns() # nanoseconds since epoch
-        order_book.modify_order(data['order_id'], timestamp, new_price=data['new_price'], new_quantity=data['new_quantity'])
-        self.write({"message": "Order modified successfully"})
 
 class ListUserOrdersHandler(tornado.web.RequestHandler):
     def get(self):
@@ -60,7 +56,7 @@ def make_order(data):
     """
     global ID
     timestamp = time.time_ns()
-    side = data.get(54) # 54 = Side
+    side = data.get(54)  # 54 = Side
     if side == b'1':
         side = 'buy'
     else:
@@ -77,7 +73,7 @@ def make_order(data):
     return order
 
 
-class FixHandler(tornado.web.RequestHandler):
+class TradeHandler(tornado.web.RequestHandler):
     # TODO fix message response to client
     parser = simplefix.FixParser()
 
@@ -117,22 +113,9 @@ class FixHandler(tornado.web.RequestHandler):
             self.write({"message": "Order quantity modified successfully"})
         else:
             self.write({"message": "Order quantity modification failed, order not found or quantity increase"})
-            # new_price = data.get(44)
-            # new_quantity = data.get(38)
-            # print(new_price, new_quantity)
-            # if new_price is not None:
-            #     new_price = float(new_price.decode())
-            # if new_quantity is not None:
-            #     new_quantity = int(new_quantity.decode())
-            # print(new_price, new_quantity)
-            # timestamp = time.time_ns()
-            # ret = order_book.modify_order(order_id, timestamp, new_price=new_price, new_quantity=new_quantity)
-            # if ret:
-            #     self.write({"message": "Order modified successfully"})
-            # else:
-            #     self.write({"message": "Order modification failed, order not found"})
 
     msg_type_handlers = {b"D": match_order, b"F": delete_order, b"G": modify_order_qty, b"H": order_stats}
+
     def post(self):
         data = json.loads(self.request.body)
         message = data['message']
@@ -143,19 +126,41 @@ class FixHandler(tornado.web.RequestHandler):
         msg_type_handler = self.msg_type_handlers[message.get(35)]
         msg_type_handler(self, message)
 
+    def get(self):
+        data = json.loads(self.request.body)
+        message = data['message']
+        self.parser.append_buffer(message)
+        message = self.parser.get_message()
+        logging.info(f"Received message: {message}")
+
+        msg_type_handler = self.msg_type_handlers[message.get(35)]
+        msg_type_handler(self, message)
 
 
+class QuoteHandler(tornado.web.RequestHandler):
+    parser = simplefix.FixParser()
+
+    def order_stats(self, data):
+        order_id = data.get(41).decode()
+        order = order_book.get_order_by_id(order_id)
+        if order:
+            self.write({"order": order.__json__()})
+        else:
+            self.write({"message": "Order not found"})
+
+    # def
 
 
 def make_app():
     return tornado.web.Application([
         (r"/", MainHandler),
         (r"/keep_alive", KeepAliveHandler),
-        (r"/modify_order", ModifyOrderHandler),
         (r"/list_user_orders", ListUserOrdersHandler),
         (r"/display_order_book", DisplayOrderBookHandler),
-        (r"/fix", FixHandler)
+        (r"/trade", TradeHandler),
+        (r"/quote", QuoteHandler),
     ], template_path="templates")
+
 
 if __name__ == "__main__":
     app = make_app()

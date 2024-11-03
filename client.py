@@ -49,7 +49,7 @@ class Initiator:
         message.append_pair(41, ID)  # ClOrdID
 
         byte_buffer = message.encode()
-        response = requests.post(f"{self.BASE_URL}/{self.TRADING_SESSION}", json={"message": byte_buffer})
+        response = requests.get(f"{self.BASE_URL}/{self.TRADING_SESSION}", json={"message": byte_buffer})
         response_data = response.json()
         print(response.json())
         if response_data.get('order', None):
@@ -132,6 +132,10 @@ class Initiator:
         message.append_pair(35,"V", header=True)  # MsgType = MarketDataRequest
         message.append_pair(263, 1)  # SubscriptionRequestType = Snapshot
         message.append_pair(264, 0)  # MarketDepth = Full Book
+
+        byte_buffer = message.encode()
+        response = requests.get(f"{self.BASE_URL}/{self.QUOTE_SESSION}", json={"message": byte_buffer})
+        print(response.json())
 
     def list_user_orders(self, user):
         response = requests.get(f"{BASE_URL}/list_user_orders?user={user}")

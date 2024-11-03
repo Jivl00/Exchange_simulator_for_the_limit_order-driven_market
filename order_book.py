@@ -181,14 +181,14 @@ class OrderBook:
         # print(order_book_df.fillna('').to_markdown(index=False))
         print(order_book_df.fillna('').to_string(index=False))
 
-    def jsonify_order_book(self):
+    def jsonify_order_book(self, depth=-1):
         """Display the order book."""
         bids = []
         asks = []
-        for price, orders in self.bids.items():
+        for price, orders in sorted(self.bids.items(), reverse=True):
             for order in orders:
                 bids.append({'ID': order.id, 'User': order.user, 'Quantity': order.quantity, 'Price': price})
-        for price, orders in self.asks.items():
+        for price, orders in sorted(self.asks.items()):
             for order in orders:
                 asks.append({'ID': order.id, 'User': order.user, 'Quantity': order.quantity, 'Price': price})
 
