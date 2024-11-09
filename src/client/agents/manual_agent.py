@@ -1,8 +1,8 @@
-from client_old import Initiator
+from src.client.client import Client
 import json
 
-config = json.load(open("config/fix_config.json"))
-manual_agent = Initiator("manual_agent", "server", config)
+config = json.load(open("config/server_config.json"))
+manual_agent = Client("manual_agent", "server", config)
 
 manual_agent.put_order({"side": "buy", "quantity": 100, "price": 20.0})
 manual_agent.put_order({"side": "sell", "quantity": 50, "price": 30.0})

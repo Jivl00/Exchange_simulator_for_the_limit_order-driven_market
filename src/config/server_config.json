@@ -1,0 +1,7 @@
+{
+        "FIX_VERSION": "8=FIX.4.4",
+    "PORT": 8888,
+    "HOST": "http://127.0.0.1",
+    "TRADING_SESSION": "trade",
+    "QUOTE_SESSION": "quote"
+}
