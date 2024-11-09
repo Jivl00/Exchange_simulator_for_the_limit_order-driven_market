@@ -22,17 +22,6 @@ class Client:
         self.PROTOCOL = FIXProtocol(sender, target)
         self.parser = self.PROTOCOL.parser
 
-    def parse_message(self, msg):
-        """
-        Parse the incoming FIX message.
-        :param msg: FIX message
-        :return: Decoded message
-        """
-        message = msg['message']
-        self.parser.append_buffer(message)
-        message = self.parser.get_message()
-        print(f"R>: {message}")
-        return message
 
     def order_stats(self, ID):
         """
@@ -43,15 +32,11 @@ class Client:
         data = {"ID": ID, "msg_type": "OrderStatusRequest"}
         message = self.PROTOCOL.encode(data)
 
-        response = requests.get(f"{self.BASE_URL}/{self.TRADING_SESSION}", json={"message": message})
-
-        response_data = response.json()
-        message = self.parse_message(response_data)
-        if message.get(39).decode() != '8':  # OrderStatus != Rejected
-            order = {'id': message.get(37).decode(), 'side': 'buy' if message.get(54).decode() == '1' else 'sell',
-                     'quantity': int(message.get(151).decode()), 'price': float(message.get(44).decode())}
-            return order
-        return None
+        response = requests.get(f"{self.BASE_URL}/{self.QUOTE_SESSION}", json={"message": message, "msg_type": data["msg_type"]})
+        response = response.json()
+        response["msg_type"] = "OrderStatus"
+        order = self.PROTOCOL.decode(response)
+        return order
 
     def put_order(self, order):
         """
@@ -61,19 +46,23 @@ class Client:
         """
         data = {"order": order, "msg_type": "NewOrderSingle"}
         message = self.PROTOCOL.encode(data)
-        response = requests.post(f"{self.BASE_URL}/{self.TRADING_SESSION}", json={"message": message})
-        print(response.json())
-        return response.json()
+        response = requests.post(f"{self.BASE_URL}/{self.TRADING_SESSION}", json={"message": message, "msg_type": data["msg_type"]})
+        response = response.json()
+        response["msg_type"] = "ExecutionReport"
+        response_data = self.PROTOCOL.decode(response)
+        if response_data["status"] is False:
+            print("\033[91mError: Order put failed.\033[0m")  # Print in red
 
+        return response_data["order_id"] if response_data["status"] else None
     def delete_order(self, ID):
         """
-        Send an order cancel request to the FIX server.
+        Send an order cancel request to the server.
         :param ID: Order ID
         :return: None
         """
         data = {"ID": ID, "msg_type": "OrderCancelRequest"}
         message = self.PROTOCOL.encode(data)
-        response = requests.post(f"{self.BASE_URL}/{self.TRADING_SESSION}", json={"message": message})
+        response = requests.post(f"{self.BASE_URL}/{self.TRADING_SESSION}", json={"message": message, "msg_type": data["msg_type"]})
         print(response.json())
 
     def modify_order_qty(self, ID, quantity):
@@ -85,7 +74,7 @@ class Client:
         """
         data = {"ID": ID, "quantity": quantity, "msg_type": "OrderModifyRequestQty"}
         message = self.PROTOCOL.encode(data)
-        response = requests.post(f"{self.BASE_URL}/{self.TRADING_SESSION}", json={"message": message})
+        response = requests.post(f"{self.BASE_URL}/{self.TRADING_SESSION}", json={"message": message, "msg_type": data["msg_type"]})
         print(response.json())
 
     def modify_order(self, ID, new_price=None, new_quantity=None):
@@ -109,14 +98,16 @@ class Client:
 
     def order_book_request(self, depth=0):
         """
-        Returns the order book from the FIX server.
+        Returns the order book from the server.
         :param depth: Market depth (0 = full book)
         :return: JSON with order book data
         """
         data = {"depth": depth, "msg_type": "MarketDataRequest"}
         message = self.PROTOCOL.encode(data)
-        response = requests.get(f"{self.BASE_URL}/{self.QUOTE_SESSION}", json={"message": message})
+        response = requests.get(f"{self.BASE_URL}/{self.QUOTE_SESSION}", json={"message": message, "msg_type": data["msg_type"]})
         order_book_data = response.json()
+        order_book_data["msg_type"] = "MarketDataSnapshot"
+        order_book_data = self.PROTOCOL.decode(order_book_data)["order_book"]
 
         return order_book_data
 
@@ -127,8 +118,12 @@ class Client:
         """
         data = {"msg_type": "UserOrderStatusRequest"}
         message = self.PROTOCOL.encode(data)
-        response = requests.get(f"{self.BASE_URL}/{self.QUOTE_SESSION}", json={"message": message})
-        print(response.json())
+        response = requests.get(f"{self.BASE_URL}/{self.QUOTE_SESSION}", json={"message": message, "msg_type": data["msg_type"]})
+        response = response.json()
+        response["msg_type"] = "UserOrderStatus"
+        data = self.PROTOCOL.decode(response)
+        data = data["user_orders"]
+        print(data)
 
     def display_order_book(self, order_book_data):
         """

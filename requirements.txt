@@ -1,0 +1,6 @@
+requests~=2.31.0
+pandas~=1.4.2
+tornado~=6.4
+simplefix~=1.0.12
+sortedcontainers~=2.4.0
+quickfix~=1.15.1
