@@ -4,9 +4,9 @@ import tornado.websocket
 import json
 import logging
 import time
-from matching_engine import FIFOMatchingEngine
-from order_book import OrderBook
-from order import Order
+from src.order_book.matching_engine import FIFOMatchingEngine
+from src.order_book.order_book import OrderBook
+from src.order_book.order import Order
 from src.protocols.fix import FIXProtocol
 
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
