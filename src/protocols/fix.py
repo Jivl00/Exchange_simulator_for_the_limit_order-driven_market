@@ -5,6 +5,9 @@ from src.protocols.IProtocol import IProtocol
 
 
 class FIXProtocol(IProtocol):
+    """
+    Custom FIX protocol implementation - version 4.4.
+    """
     def __init__(self, sender, target="unknown"):
         super().__init__()
         self.version = "FIX.4.4"
@@ -16,6 +19,11 @@ class FIXProtocol(IProtocol):
         self.parser = simplefix.parser.FixParser()
 
     def set_target(self, target):
+        """
+        Set the target ID.
+        :param target: Target ID
+        :return: None
+        """
         self.TARGET = "56=" + target
 
     def fix_message_init(self):
@@ -33,6 +41,11 @@ class FIXProtocol(IProtocol):
         return message
 
     def OrderStatusRequest_encode(self, data):
+        """
+        Encode the OrderStatusRequest message.
+        :param data: Dictionary with order ID
+        :return: simplefix.FixMessage object
+        """
         ID = data["ID"]
         message = self.fix_message_init()
         message.append_pair(35, "H", header=True)  # MsgType = OrderStatusRequest
@@ -40,6 +53,11 @@ class FIXProtocol(IProtocol):
         return message
 
     def NewOrderSingle_encode(self, data):
+        """
+        Encode the NewOrderSingle message.
+        :param data: Dictionary with order details (side, quantity, price)
+        :return: simplefix.FixMessage object
+        """
         order = data["order"]
         message = self.fix_message_init()
         message.append_pair(35, "D", header=True)  # MsgType = NewOrderSingle
@@ -49,6 +67,11 @@ class FIXProtocol(IProtocol):
         return message
 
     def OrderCancelRequest_encode(self, data):
+        """
+        Encode the OrderCancelRequest message.
+        :param data: Dictionary with order ID
+        :return: simplefix.FixMessage object
+        """
         ID = data["ID"]
         message = self.fix_message_init()
         message.append_pair(35, "F", header=True)  # MsgType = OrderCancelRequest
@@ -56,6 +79,11 @@ class FIXProtocol(IProtocol):
         return message
 
     def OrderModifyRequestQty_encode(self, data):
+        """
+        Encode the OrderModifyRequestQty message.
+        :param data: Dictionary with order ID and new quantity
+        :return: simplefix.FixMessage object
+        """
         ID = data["ID"]
         quantity = data["quantity"]
         message = self.fix_message_init()
@@ -65,6 +93,11 @@ class FIXProtocol(IProtocol):
         return message
 
     def MarketDataRequest_encode(self, data):
+        """
+        Encode the MarketDataRequest message.
+        :param data: Dictionary with market depth
+        :return: simplefix.FixMessage object
+        """
         depth = data["depth"]
         message = self.fix_message_init()
         message.append_pair(35, "V", header=True)  # MsgType = MarketDataRequest
@@ -72,7 +105,12 @@ class FIXProtocol(IProtocol):
         message.append_pair(264, depth)  # MarketDepth
         return message
 
-    def UserOrderStatusRequest_encode(self, data):
+    def UserOrderStatusRequest_encode(self, _):
+        """
+        Encode the UserOrderStatusRequest message.
+        :param _: (unused)
+        :return: simplefix.FixMessage object
+        """
         message = self.fix_message_init()
         message.append_pair(35, "AF", header=True)  # MsgType = OrderMassStatusRequest
         message.append_pair(585, 8)  # MassStatusReqType = Status for orders for a PartyID
@@ -80,22 +118,32 @@ class FIXProtocol(IProtocol):
         return message
 
     def OrderStatus_encode(self, data):
+        """
+        Encode the OrderStatus message.
+        :param data: Dictionary with order details (ID, side, quantity, price)
+        :return: simplefix.FixMessage object
+        """
         order = data["order"]
         message = self.fix_message_init()
         message.append_pair(35, "8")  # ExecutionReport
         message.append_pair(150, "1")  # ExecType = Partially filled
-        if order:
+        if order: # Order found
             order = order.__json__()
             message.append_pair(39, "1")  # OrdStatus = Remaining (partially filled) quantity
             message.append_pair(37, order['id'])  # OrderID
             message.append_pair(54, 1 if order['side'] == 'buy' else 2)  # Side
             message.append_pair(151, order['quantity'])  # LeavesQty
             message.append_pair(44, order['price'])  # Price
-        else:
+        else: # Order not found
             message.append_pair(39, "8")  # OrdStatus = Rejected
         return message
 
     def ExecutionReport_encode(self, data):
+        """
+        Encode the ExecutionReport message.
+        :param data: Dictionary with order ID and status
+        :return: simplefix.FixMessage object
+        """
         order_id = data["order_id"]
         status = data["status"]
         message = self.fix_message_init()
@@ -112,6 +160,11 @@ class FIXProtocol(IProtocol):
         return message
 
     def ExecutionReportCancel_encode(self, data):
+        """
+        Encode the ExecutionReportCancel message.
+        :param data: Dictionary with order ID and status
+        :return: simplefix.FixMessage object
+        """
         message = self.fix_message_init()
         message.append_pair(37, data["order_id"])
         message.append_pair(39, "4")  # OrdStatus = Canceled
@@ -125,6 +178,11 @@ class FIXProtocol(IProtocol):
         return message
 
     def ExecutionReportCancelReplace_encode(self, data):
+        """
+        Encode the ExecutionReportCancelReplace message.
+        :param data: Dictionary with order ID and status
+        :return: simplefix.FixMessage object
+        """
         message = self.fix_message_init()
         message.append_pair(37, data["order_id"])
         message.append_pair(39, "5")  # OrdStatus = Replaced
@@ -138,13 +196,23 @@ class FIXProtocol(IProtocol):
         return message
 
     def MarketDataSnapshot_encode(self, data):
+        """
+        Encode the MarketDataSnapshot message.
+        :param data: Dictionary with order book
+        :return: simplefix.FixMessage object
+        """
         order_book = data["order_book"]
         message = self.fix_message_init()
         message.append_pair(35, "W")
-        message.append_pair(58, json.dumps(order_book))
+        message.append_pair(58, json.dumps(order_book)) # Simplification of FIX protocol
         return message
 
     def UserOrders_encode(self, data):
+        """
+        Encode the UserOrders message.
+        :param data: Dictionary with user orders
+        :return: simplefix.FixMessage object
+        """
         orders = data["user_orders"]
         message = self.fix_message_init()
         message.append_pair(35, "8")
@@ -152,28 +220,34 @@ class FIXProtocol(IProtocol):
         message.append_pair(58, json.dumps(orders))
         return message
 
-    def encode(self, data):
+    def encode(self, msg_data):
+        """
+        Encode the incoming message to the FIX protocol.
+        :param msg_data: Dictionary with message details
+        :return: Encoded message
+        """
         msg_types_map = {
             # Client -> Server
-            "OrderStatusRequest": self.OrderStatusRequest_encode,
-            "NewOrderSingle": self.NewOrderSingle_encode,
-            "OrderCancelRequest": self.OrderCancelRequest_encode,
-            "OrderModifyRequestQty": self.OrderModifyRequestQty_encode,
-            "MarketDataRequest": self.MarketDataRequest_encode,
-            "UserOrderStatusRequest": self.UserOrderStatusRequest_encode,
+            "OrderStatusRequest": lambda data: self.OrderStatusRequest_encode(data),
+            "NewOrderSingle": lambda data: self.NewOrderSingle_encode(data),
+            "OrderCancelRequest": lambda data: self.OrderCancelRequest_encode(data),
+            "OrderModifyRequestQty": lambda data: self.OrderModifyRequestQty_encode(data),
+            "MarketDataRequest": lambda data: self.MarketDataRequest_encode(data),
+            "UserOrderStatusRequest": lambda data: self.UserOrderStatusRequest_encode(data),
 
             # Server -> Client
-            "OrderStatus": self.OrderStatus_encode,
-            "ExecutionReport": self.ExecutionReport_encode,
-            "ExecutionReportCancel": self.ExecutionReportCancel_encode,
-            "ExecutionReportModify": self.ExecutionReportCancelReplace_encode,
-            "MarketDataSnapshot": self.MarketDataSnapshot_encode,
-            "UserOrderStatus": self.UserOrders_encode,
+            "OrderStatus": lambda data: self.OrderStatus_encode(data),
+            "ExecutionReport": lambda data: self.ExecutionReport_encode(data),
+            "ExecutionReportCancel": lambda data: self.ExecutionReportCancel_encode(data),
+            "ExecutionReportModify": lambda data: self.ExecutionReportCancelReplace_encode(data),
+            "MarketDataSnapshot": lambda data: self.MarketDataSnapshot_encode(data),
+            "UserOrderStatus": lambda data: self.UserOrders_encode(data),
 
         }
-        # TODO unknown message type error handling
-        msg_type = data["msg_type"]
-        message = msg_types_map[msg_type](data)
+        msg_type = msg_data["msg_type"]
+        if msg_type not in msg_types_map:
+            raise ValueError(f"Unknown message type: {msg_type}")
+        message = msg_types_map[msg_type](msg_data)
         byte_buffer = message.encode()
         return byte_buffer
 
@@ -187,14 +261,26 @@ class FIXProtocol(IProtocol):
         message = self.parser.get_message()
         return message
 
-    def OrderStatus_decode(self, data):
+    @staticmethod
+    def OrderStatus_decode(data):
+        """
+        Decode the OrderStatus message.
+        :param data: FIX message
+        :return: Dictionary with order details (id, side, quantity, price) if found, None otherwise
+        """
         if data.get(39).decode() == '8':  # OrderStatus = Rejected
             return None
         order = {'id': data.get(37).decode(), 'side': 'buy' if data.get(54).decode() == '1' else 'sell',
                  'quantity': int(data.get(151).decode()), 'price': float(data.get(44).decode())}
         return order
 
-    def ExecutionReport_decode(self, data):
+    @staticmethod
+    def ExecutionReport_decode(data):
+        """
+        Decode the ExecutionReport message.
+        :param data: FIX message
+        :return: Dictionary with order ID and status (True if partially filled, None if fully filled, False otherwise)
+        """
         order_id = data.get(37).decode()
         status = data.get(39).decode()
         if status == '1':
@@ -205,7 +291,13 @@ class FIXProtocol(IProtocol):
             status = False
         return {"order_id": order_id, "status": status}
 
-    def ExecutionReportCancel_decode(self, data):
+    @staticmethod
+    def ExecutionReportCancel_decode(data):
+        """
+        Decode the ExecutionReportCancel message.
+        :param data: FIX message
+        :return: Dictionary with order ID and status (True if successful, False otherwise)
+        """
         order_id = data.get(37).decode()
         status = data.get(35).decode() == '8'
         if status: # Execution report
@@ -214,21 +306,45 @@ class FIXProtocol(IProtocol):
             status = False
         return {"order_id": order_id, "status": status}
 
-    def MarketDataSnapshot_decode(self, data):
+    @staticmethod
+    def MarketDataSnapshot_decode(data):
+        """
+        Decode the MarketDataSnapshot message.
+        :param data: FIX message
+        :return: Dictionary with order book
+        """
         order_book = json.loads(data.get(58).decode())
         order_book = json.loads(order_book)
         return {"order_book": order_book}
 
-    def OrderStatusRequest_decode(self, data):
+    @staticmethod
+    def OrderStatusRequest_decode(data):
+        """
+        Decode the OrderStatusRequest message.
+        :param data: FIX message
+        :return: Dictionary with order ID
+        """
         order_id = data.get(41).decode()
         sender = data.get(49).decode()
         return {"id": order_id, "sender": sender}
 
-    def UserOrders_decode(self, data):
+    @staticmethod
+    def UserOrders_decode(data):
+        """
+        Decode the UserOrders message.
+        :param data: FIX message
+        :return: Dictionary with user orders
+        """
         user_orders = json.loads(data.get(58).decode())
         return {"user_orders": user_orders}
 
-    def NewOrderSingle_decode(self, data):
+    @staticmethod
+    def NewOrderSingle_decode(data):
+        """
+        Decode the NewOrderSingle message.
+        :param data: FIX message
+        :return: Dictionary with order details (user, side, quantity, price)
+        """
 
         order = {
             "user": data.get(49).decode(),
@@ -238,37 +354,61 @@ class FIXProtocol(IProtocol):
         }
         return {"order": order}
 
-    def OrderCancelRequest_decode(self, data):
+    @staticmethod
+    def OrderCancelRequest_decode(data):
+        """
+        Decode the OrderCancelRequest message.
+        :param data: FIX message
+        :return: Dictionary with order ID
+        """
         order_id = data.get(41).decode()
         return {"order_id": order_id}
 
-    def OrderModifyRequestQty_decode(self, data):
+    @staticmethod
+    def OrderModifyRequestQty_decode(data):
+        """
+        Decode the OrderModifyRequestQty message.
+        :param data: FIX message
+        :return: Dictionary with order ID and new quantity
+        """
         order_id = data.get(41).decode()
         quantity = int(data.get(38).decode())
         return {"order_id": order_id, "quantity": quantity}
 
-    def UserOrderStatusRequest_decode(self, data):
+    @staticmethod
+    def UserOrderStatusRequest_decode(data):
+        """
+        Decode the UserOrderStatusRequest message.
+        :param data: FIX message
+        :return: Dictionary with user ID
+        """
         user = data.get(49).decode()
         return {"user": user}
 
     def decode(self, message):
+        """
+        Decode the incoming message from the FIX protocol.
+        :param message: Dictionary with message details
+        :return: Decoded message
+        """
         msg_type = message['msg_type']
         message = self.parse_message(message['message'])
         msg_types_map = {
             # Client -> Server
-            "OrderStatus": self.OrderStatus_decode,
-            "ExecutionReport": self.ExecutionReport_decode,
-            "ExecutionReportCancel": self.ExecutionReportCancel_decode,
-            "ExecutionReportModify": self.ExecutionReportCancel_decode,
-            "MarketDataSnapshot": self.MarketDataSnapshot_decode,
-            "UserOrderStatus": self.UserOrders_decode,
+            "OrderStatus": lambda msg: self.OrderStatus_decode(msg),
+            "ExecutionReport": lambda msg: self.ExecutionReport_decode(msg),
+            "ExecutionReportCancel": lambda msg: self.ExecutionReportCancel_decode(msg),
+            "ExecutionReportModify": lambda msg: self.ExecutionReportCancel_decode(msg),
+            "MarketDataSnapshot": lambda msg: self.MarketDataSnapshot_decode(msg),
+            "UserOrderStatus": lambda msg: self.UserOrders_decode(msg),
 
             # Server -> Client
-            "OrderStatusRequest": self.OrderStatusRequest_decode,
-            "NewOrderSingle": self.NewOrderSingle_decode,
-            "OrderCancelRequest": self.OrderCancelRequest_decode,
-            "OrderModifyRequestQty": self.OrderModifyRequestQty_decode,
-            "UserOrderStatusRequest": self.UserOrderStatusRequest_decode,
+            "OrderStatusRequest": lambda msg: self.OrderStatusRequest_decode(msg),
+            "NewOrderSingle": lambda msg: self.NewOrderSingle_decode(msg),
+            "OrderCancelRequest": lambda msg: self.OrderCancelRequest_decode(msg),
+            "OrderModifyRequestQty": lambda msg: self.OrderModifyRequestQty_decode(msg),
+            "UserOrderStatusRequest": lambda msg: self.UserOrderStatusRequest_decode(msg),
+
 
         }
         data = msg_types_map[msg_type](message)
