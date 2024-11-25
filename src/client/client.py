@@ -1,6 +1,6 @@
 import requests
 import pandas as pd
-from src.protocols.fix import FIXProtocol
+from src.protocols.FIXProtocol import FIXProtocol
 
 
 class Client:

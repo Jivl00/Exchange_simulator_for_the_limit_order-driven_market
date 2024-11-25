@@ -7,7 +7,7 @@ import time
 from src.order_book.matching_engine import FIFOMatchingEngine
 from src.order_book.order_book import OrderBook
 from src.order_book.order import Order
-from src.protocols.fix import FIXProtocol
+from src.protocols.FIXProtocol import FIXProtocol
 
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
 logging.getLogger("tornado.access").disabled = True
