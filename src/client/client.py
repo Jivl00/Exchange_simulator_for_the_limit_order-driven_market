@@ -20,7 +20,6 @@ class Client:
         self.QUOTE_SESSION = config["QUOTE_SESSION"]
 
         self.PROTOCOL = FIXProtocol(sender, target)
-        self.parser = self.PROTOCOL.parser
 
 
     def order_stats(self, ID):
@@ -46,6 +45,7 @@ class Client:
         """
         data = {"order": order, "msg_type": "NewOrderSingle"}
         message = self.PROTOCOL.encode(data)
+
         response = requests.post(f"{self.BASE_URL}/{self.TRADING_SESSION}", json={"message": message, "msg_type": data["msg_type"]})
         response = response.json()
         response["msg_type"] = "ExecutionReport"
@@ -58,24 +58,31 @@ class Client:
         """
         Send an order cancel request to the server.
         :param ID: Order ID
-        :return: None
+        :return: True if successful, False otherwise
         """
         data = {"ID": ID, "msg_type": "OrderCancelRequest"}
         message = self.PROTOCOL.encode(data)
+
         response = requests.post(f"{self.BASE_URL}/{self.TRADING_SESSION}", json={"message": message, "msg_type": data["msg_type"]})
-        print(response.json())
+        response = response.json()
+        response["msg_type"] = "ExecutionReportCancel"
+        response_data = self.PROTOCOL.decode(response)
+        return response_data["status"]
 
     def modify_order_qty(self, ID, quantity):
         """
         Modify order quantity - only decrease is allowed.
         :param ID: Order ID
         :param quantity: New quantity
-        :return: None
+        :return: True if successful, False otherwise
         """
         data = {"ID": ID, "quantity": quantity, "msg_type": "OrderModifyRequestQty"}
         message = self.PROTOCOL.encode(data)
         response = requests.post(f"{self.BASE_URL}/{self.TRADING_SESSION}", json={"message": message, "msg_type": data["msg_type"]})
-        print(response.json())
+        response = response.json()
+        response["msg_type"] = "ExecutionReportModify"
+        response_data = self.PROTOCOL.decode(response)
+        return response_data["status"]
 
     def modify_order(self, ID, new_price=None, new_quantity=None):
         """
@@ -83,12 +90,12 @@ class Client:
         :param ID: Order ID
         :param new_price: New price (or None)
         :param new_quantity: New quantity (or None)
-        :return: None
+        :return: Order ID if not fully filled, None otherwise
         """
         order = self.order_stats(ID)
         if order is None:
-            print(f"Order {ID} not found.")
-            return
+            print(f"\033[91mError: Order {ID} not found.\033[0m")
+            return None
         self.delete_order(ID)
         if new_price is not None:
             order['price'] = new_price
@@ -123,9 +130,11 @@ class Client:
         response["msg_type"] = "UserOrderStatus"
         data = self.PROTOCOL.decode(response)
         data = data["user_orders"]
-        print(data)
+        print(pd.DataFrame(data).T)
+        return data
 
-    def display_order_book(self, order_book_data):
+    @staticmethod
+    def display_order_book(order_book_data):
         """
         Display the order book in a human-readable format. For debugging purposes.
         :param order_book_data: JSON with order book data

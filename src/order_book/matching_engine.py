@@ -1,4 +1,3 @@
-from src.order_book.order_book import OrderBook
 from collections import deque
 import logging
 

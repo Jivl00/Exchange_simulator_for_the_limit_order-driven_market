@@ -205,6 +205,15 @@ class FIXProtocol(IProtocol):
             status = False
         return {"order_id": order_id, "status": status}
 
+    def ExecutionReportCancel_decode(self, data):
+        order_id = data.get(37).decode()
+        status = data.get(35).decode() == '8'
+        if status: # Execution report
+            status = True
+        else: # Order Cancel/Replace Reject
+            status = False
+        return {"order_id": order_id, "status": status}
+
     def MarketDataSnapshot_decode(self, data):
         order_book = json.loads(data.get(58).decode())
         order_book = json.loads(order_book)
@@ -249,6 +258,8 @@ class FIXProtocol(IProtocol):
             # Client -> Server
             "OrderStatus": self.OrderStatus_decode,
             "ExecutionReport": self.ExecutionReport_decode,
+            "ExecutionReportCancel": self.ExecutionReportCancel_decode,
+            "ExecutionReportModify": self.ExecutionReportCancel_decode,
             "MarketDataSnapshot": self.MarketDataSnapshot_decode,
             "UserOrderStatus": self.UserOrders_decode,
 
