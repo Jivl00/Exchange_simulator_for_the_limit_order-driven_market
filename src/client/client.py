@@ -22,13 +22,14 @@ class Client:
         self.PROTOCOL = FIXProtocol(sender, target)
 
 
-    def order_stats(self, ID):
+    def order_stats(self, ID, product):
         """
         Request order status from the server.
         :param ID: Order ID
+        :param product: Product name
         :return: JSON with order details (id, timestamp, user, side, quantity, price) if found, None otherwise
         """
-        data = {"ID": ID, "msg_type": "OrderStatusRequest"}
+        data = {"ID": ID, "product": product, "msg_type": "OrderStatusRequest"}
         message = self.PROTOCOL.encode(data)
 
         response = requests.get(f"{self.BASE_URL}/{self.QUOTE_SESSION}", json={"message": message, "msg_type": data["msg_type"]})
@@ -37,13 +38,14 @@ class Client:
         order = self.PROTOCOL.decode(response)
         return order
 
-    def put_order(self, order):
+    def put_order(self, order, product):
         """
         Send a new order request to the server.
         :param order: Dictionary containing order details
+        :param product: Product name
         :return: Order ID if not fully filled, None otherwise
         """
-        data = {"order": order, "msg_type": "NewOrderSingle"}
+        data = {"order": order, "product": product, "msg_type": "NewOrderSingle"}
         message = self.PROTOCOL.encode(data)
 
         response = requests.post(f"{self.BASE_URL}/{self.TRADING_SESSION}", json={"message": message, "msg_type": data["msg_type"]})
@@ -54,13 +56,14 @@ class Client:
             print("\033[91mError: Order put failed.\033[0m")  # Print in red
 
         return response_data["order_id"] if response_data["status"] else None
-    def delete_order(self, ID):
+    def delete_order(self, ID, product):
         """
         Send an order cancel request to the server.
         :param ID: Order ID
+        :param product: Product name
         :return: True if successful, False otherwise
         """
-        data = {"ID": ID, "msg_type": "OrderCancelRequest"}
+        data = {"ID": ID, "product": product, "msg_type": "OrderCancelRequest"}
         message = self.PROTOCOL.encode(data)
 
         response = requests.post(f"{self.BASE_URL}/{self.TRADING_SESSION}", json={"message": message, "msg_type": data["msg_type"]})
@@ -69,14 +72,15 @@ class Client:
         response_data = self.PROTOCOL.decode(response)
         return response_data["status"]
 
-    def modify_order_qty(self, ID, quantity):
+    def modify_order_qty(self, ID, quantity, product):
         """
         Modify order quantity - only decrease is allowed.
         :param ID: Order ID
         :param quantity: New quantity
+        :param product: Product name
         :return: True if successful, False otherwise
         """
-        data = {"ID": ID, "quantity": quantity, "msg_type": "OrderModifyRequestQty"}
+        data = {"ID": ID, "quantity": quantity, "product": product, "msg_type": "OrderModifyRequestQty"}
         message = self.PROTOCOL.encode(data)
         response = requests.post(f"{self.BASE_URL}/{self.TRADING_SESSION}", json={"message": message, "msg_type": data["msg_type"]})
         response = response.json()
@@ -84,32 +88,34 @@ class Client:
         response_data = self.PROTOCOL.decode(response)
         return response_data["status"]
 
-    def modify_order(self, ID, new_price=None, new_quantity=None):
+    def modify_order(self, ID, product, new_price=None, new_quantity=None):
         """
         Modify an existing order - price and/or quantity.
         :param ID: Order ID
+        :param product: Product name
         :param new_price: New price (or None)
         :param new_quantity: New quantity (or None)
         :return: Order ID if not fully filled, None otherwise
         """
-        order = self.order_stats(ID)
+        order = self.order_stats(ID, product)
         if order is None:
             print(f"\033[91mError: Order {ID} not found.\033[0m")
             return None
-        self.delete_order(ID)
+        self.delete_order(ID, product)
         if new_price is not None:
             order['price'] = new_price
         if new_quantity is not None:
             order['quantity'] = new_quantity
-        return self.put_order(order)
+        return self.put_order(order, product)
 
-    def order_book_request(self, depth=0):
+    def order_book_request(self, product, depth=0):
         """
-        Returns the order book from the server.
+        Returns the order book for a specific product from the server.
+        :param product: Product name
         :param depth: Market depth (0 = full book)
         :return: JSON with order book data
         """
-        data = {"depth": depth, "msg_type": "MarketDataRequest"}
+        data = {"depth": depth, "product": product, "msg_type": "MarketDataRequest"}
         message = self.PROTOCOL.encode(data)
         response = requests.get(f"{self.BASE_URL}/{self.QUOTE_SESSION}", json={"message": message, "msg_type": data["msg_type"]})
         order_book_data = response.json()
@@ -118,12 +124,13 @@ class Client:
 
         return order_book_data
 
-    def list_user_orders(self):
+    def list_user_orders(self, product):
         """
         Returns a list of orders for a specific user.
+        :param product: Product name
         :return: JSON with order data
         """
-        data = {"msg_type": "UserOrderStatusRequest"}
+        data = {"product": product, "msg_type": "UserOrderStatusRequest"}
         message = self.PROTOCOL.encode(data)
         response = requests.get(f"{self.BASE_URL}/{self.QUOTE_SESSION}", json={"message": message, "msg_type": data["msg_type"]})
         response = response.json()
@@ -134,12 +141,19 @@ class Client:
         return data
 
     @staticmethod
-    def display_order_book(order_book_data):
+    def display_order_book(order_book_data, product=None):
         """
         Display the order book in a human-readable format. For debugging purposes.
         :param order_book_data: JSON with order book data
+        :param product: Product name
         :return: None
         """
+        if product is not None:
+            print(f"Order book for {product}:")
+            print("=====================================")
+        if order_book_data is None:
+            print(f"\033[91mError: Order book for {product} not found.\033[0m")
+            return
         bids_df = pd.DataFrame(order_book_data['Bids'])
         asks_df = pd.DataFrame(order_book_data['Asks'])
 

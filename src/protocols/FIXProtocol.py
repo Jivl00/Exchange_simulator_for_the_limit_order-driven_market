@@ -47,9 +47,11 @@ class FIXProtocol(IProtocol):
         :return: simplefix.FixMessage object
         """
         ID = data["ID"]
+        product = data["product"]
         message = self.fix_message_init()
         message.append_pair(35, "H", header=True)  # MsgType = OrderStatusRequest
         message.append_pair(41, ID)  # ClOrdID
+        message.append_pair(55, product) # Symbol (used as product name)
         return message
 
     def NewOrderSingle_encode(self, data):
@@ -59,11 +61,13 @@ class FIXProtocol(IProtocol):
         :return: simplefix.FixMessage object
         """
         order = data["order"]
+        product = data["product"]
         message = self.fix_message_init()
         message.append_pair(35, "D", header=True)  # MsgType = NewOrderSingle
         message.append_pair(54, 1 if order['side'] == 'buy' else 2)  # Side
         message.append_pair(38, order['quantity'])  # Quantity
         message.append_pair(44, order['price'])  # Price
+        message.append_pair(55, product) # Symbol (used as product name)
         return message
 
     def OrderCancelRequest_encode(self, data):
@@ -73,9 +77,11 @@ class FIXProtocol(IProtocol):
         :return: simplefix.FixMessage object
         """
         ID = data["ID"]
+        product = data["product"]
         message = self.fix_message_init()
         message.append_pair(35, "F", header=True)  # MsgType = OrderCancelRequest
         message.append_pair(41, ID)  # ClOrdID
+        message.append_pair(55, product) # Symbol (used as product name)
         return message
 
     def OrderModifyRequestQty_encode(self, data):
@@ -86,10 +92,12 @@ class FIXProtocol(IProtocol):
         """
         ID = data["ID"]
         quantity = data["quantity"]
+        product = data["product"]
         message = self.fix_message_init()
         message.append_pair(35, "G", header=True)  # MsgType = OrderCancelReplaceRequest
         message.append_pair(41, ID)  # OrigClOrdID
         message.append_pair(38, quantity)  # Quantity
+        message.append_pair(55, product) # Symbol (used as product name)
         return message
 
     def MarketDataRequest_encode(self, data):
@@ -99,22 +107,26 @@ class FIXProtocol(IProtocol):
         :return: simplefix.FixMessage object
         """
         depth = data["depth"]
+        product = data["product"]
         message = self.fix_message_init()
         message.append_pair(35, "V", header=True)  # MsgType = MarketDataRequest
         message.append_pair(263, 0)  # SubscriptionRequestType = Snapshot
         message.append_pair(264, depth)  # MarketDepth
+        message.append_pair(55, product) # Symbol (used as product name)
         return message
 
-    def UserOrderStatusRequest_encode(self, _):
+    def UserOrderStatusRequest_encode(self, data):
         """
         Encode the UserOrderStatusRequest message.
-        :param _: (unused)
+        :param data: Dictionary with product name
         :return: simplefix.FixMessage object
         """
+        product = data["product"]
         message = self.fix_message_init()
         message.append_pair(35, "AF", header=True)  # MsgType = OrderMassStatusRequest
         message.append_pair(585, 8)  # MassStatusReqType = Status for orders for a PartyID
         message.append_pair(448, self.SENDER.split('=')[1])  # PartyID
+        message.append_pair(55, product) # Symbol (used as product name)
         return message
 
     def OrderStatus_encode(self, data):
@@ -314,7 +326,8 @@ class FIXProtocol(IProtocol):
         :return: Dictionary with order book
         """
         order_book = json.loads(data.get(58).decode())
-        order_book = json.loads(order_book)
+        if isinstance(order_book, str):
+            order_book = json.loads(order_book)
         return {"order_book": order_book}
 
     @staticmethod
@@ -326,7 +339,8 @@ class FIXProtocol(IProtocol):
         """
         order_id = data.get(41).decode()
         sender = data.get(49).decode()
-        return {"id": order_id, "sender": sender}
+        product = data.get(55).decode() # Symbol (used as product name)
+        return {"id": order_id, "sender": sender, "product": product}
 
     @staticmethod
     def UserOrders_decode(data):
@@ -352,7 +366,7 @@ class FIXProtocol(IProtocol):
             "quantity": int(data.get(38).decode()),
             "price": float(data.get(44).decode())
         }
-        return {"order": order}
+        return {"order": order, "product": data.get(55).decode()}
 
     @staticmethod
     def OrderCancelRequest_decode(data):
@@ -362,7 +376,8 @@ class FIXProtocol(IProtocol):
         :return: Dictionary with order ID
         """
         order_id = data.get(41).decode()
-        return {"order_id": order_id}
+        product = data.get(55).decode() # Symbol (used as product name)
+        return {"order_id": order_id, "product": product}
 
     @staticmethod
     def OrderModifyRequestQty_decode(data):
@@ -373,7 +388,19 @@ class FIXProtocol(IProtocol):
         """
         order_id = data.get(41).decode()
         quantity = int(data.get(38).decode())
-        return {"order_id": order_id, "quantity": quantity}
+        product = data.get(55).decode() # Symbol (used as product name)
+        return {"order_id": order_id, "quantity": quantity, "product": product}
+
+    @staticmethod
+    def MarketDataRequest_decode(data):
+        """
+        Decode the MarketDataRequest message.
+        :param data: FIX message
+        :return: Dictionary with market depth
+        """
+        depth = int(data.get(264).decode())
+        product = data.get(55).decode() # Symbol (used as product name)
+        return {"depth": depth, "product": product}
 
     @staticmethod
     def UserOrderStatusRequest_decode(data):
@@ -383,7 +410,8 @@ class FIXProtocol(IProtocol):
         :return: Dictionary with user ID
         """
         user = data.get(49).decode()
-        return {"user": user}
+        product = data.get(55).decode() # Symbol (used as product name)
+        return {"user": user, "product": product}
 
     def decode(self, message):
         """
@@ -407,6 +435,7 @@ class FIXProtocol(IProtocol):
             "NewOrderSingle": lambda msg: self.NewOrderSingle_decode(msg),
             "OrderCancelRequest": lambda msg: self.OrderCancelRequest_decode(msg),
             "OrderModifyRequestQty": lambda msg: self.OrderModifyRequestQty_decode(msg),
+            "MarketDataRequest": lambda msg: self.MarketDataRequest_decode(msg),
             "UserOrderStatusRequest": lambda msg: self.UserOrderStatusRequest_decode(msg),
 
 

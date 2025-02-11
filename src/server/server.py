@@ -16,9 +16,27 @@ config = json.load(open("config/server_config.json"))
 MSG_SEQ_NUM = 0
 ID = 0
 
-order_book = OrderBook()
-fifo_matching_engine = FIFOMatchingEngine(order_book)
+# Initialize order books and matching engines for multiple products
+order_books = {
+    "product1": OrderBook(),
+    "product2": OrderBook(),
+    # Add more products as needed
+}
+
+matching_engines = {
+    "product1": FIFOMatchingEngine(order_books["product1"]),
+    "product2": FIFOMatchingEngine(order_books["product2"]),
+    # Add more products as needed
+}
 protocol = FIXProtocol("server")
+
+def product_exists(product):
+    """
+    Check if the product is valid.
+    :param product: Product name
+    :return: True if valid, False otherwise
+    """
+    return product in order_books
 
 
 class MainHandler(tornado.web.RequestHandler):
@@ -37,7 +55,7 @@ class MsgHandler(tornado.web.RequestHandler):
     Subclasses must define `msg_type_handlers`.
     """
 
-    msg_type_handlers = {}  # must be overridden in subclasses
+    msg_type_handlers = {}  # Must be overridden in subclasses
 
     def handle_msg(self):
         """
@@ -48,7 +66,7 @@ class MsgHandler(tornado.web.RequestHandler):
         logging.info(f"R> {message['message']}")
         msg_type = message["msg_type"]
 
-        handler = self.msg_type_handlers.get(msg_type) # call appropriate handler
+        handler = self.msg_type_handlers.get(msg_type) # Call appropriate handler
         if not handler:
             self.set_status(400)
             self.write({"error": f"Unknown message type: {msg_type}"})
@@ -70,6 +88,9 @@ class TradingHandler(MsgHandler):
         """
         global ID
         message = protocol.decode(message)
+        product = message["product"]
+        if not product_exists(product):
+            return protocol.encode({"order_id": -1, "status": False, "msg_type": "ExecutionReport"})
         order = Order(
             str(ID),  # Order ID
             time.time_ns(),  # Timestamp in nanoseconds
@@ -79,7 +100,7 @@ class TradingHandler(MsgHandler):
             message["order"]["price"]
         )
         ID += 1  # Increment order ID
-        status = fifo_matching_engine.match_order(order)  # Match order
+        status = matching_engines[product].match_order(order)  # Match order
         protocol.set_target(message["order"]["user"])  # Set target to user
         return protocol.encode({"order_id": order.id, "status": status, "msg_type": "ExecutionReport"})
 
@@ -91,11 +112,14 @@ class TradingHandler(MsgHandler):
         :return: server response
         """
         message = protocol.decode(message)
+        product = message["product"]
+        if not product_exists(product):
+            return protocol.encode({"order_id": -1, "status": False, "msg_type": "ExecutionReportCancel"})
         order_id = message["order_id"]
-        order = order_book.get_order_by_id(order_id)
+        order = order_books[product].get_order_by_id(order_id)
         if order is None:
             return protocol.encode({"order_id": order_id, "status": False, "msg_type": "ExecutionReportCancel"})
-        order_book.delete_order(order_id)
+        order_books[product].delete_order(order_id)
         protocol.set_target(order.user)
         return protocol.encode({"order_id": order_id, "status": True, "msg_type": "ExecutionReportCancel"})
 
@@ -107,12 +131,15 @@ class TradingHandler(MsgHandler):
         :return: server response
         """
         message = protocol.decode(message)
+        product = message["product"]
+        if not product_exists(product):
+            return protocol.encode({"order_id": -1, "status": False, "msg_type": "ExecutionReportModify"})
         order_id = message["order_id"]
         quantity = message["quantity"]
-        order = order_book.get_order_by_id(order_id)
+        order = order_books[product].get_order_by_id(order_id)
         if order is None:
             return protocol.encode({"order_id": order_id, "status": False, "msg_type": "ExecutionReportModify"})
-        ret = order_book.modify_order_qty(order_id, quantity)
+        ret = order_books[product].modify_order_qty(order_id, quantity)
         protocol.set_target(order.user)
         return protocol.encode({"order_id": order_id, "status": ret, "msg_type": "ExecutionReportModify"})
 
@@ -139,18 +166,27 @@ class QuoteHandler(MsgHandler):
         :return: server response
         """
         message = protocol.decode(message)
+        product = message["product"]
+        if not product_exists(product):
+            return protocol.encode({"order": None, "msg_type": "OrderStatus"})
+        order_book = order_books[product]
         order_id = message["id"]
         order = order_book.get_order_by_id(order_id)
         protocol.set_target(message["sender"])
         return protocol.encode({"order": order, "msg_type": "OrderStatus"})
 
     @staticmethod
-    def order_book_request(_):
+    def order_book_request(message):
         """
         Returns the order book.
-        :param _: (unused)
+        :param message: client message with product name
         :return: server response
         """
+        message = protocol.decode(message)
+        product = message["product"]
+        if not product_exists(product):
+            return protocol.encode({"order_book": None, "msg_type": "MarketDataSnapshot"})
+        order_book = order_books[product]
         order_book_data = order_book.jsonify_order_book()
         return protocol.encode({"order_book": order_book_data, "msg_type": "MarketDataSnapshot"})
 
@@ -162,6 +198,10 @@ class QuoteHandler(MsgHandler):
         :return: server response
         """
         message = protocol.decode(message)
+        product = message["product"]
+        if not product_exists(product):
+            return protocol.encode({"user_orders": None, "msg_type": "UserOrderStatus"})
+        order_book = order_books[product]
         user_orders = order_book.get_orders_by_user(message["user"])
         user_orders = {order.id: order.__json__() for order in user_orders}
         protocol.set_target(message["user"])
