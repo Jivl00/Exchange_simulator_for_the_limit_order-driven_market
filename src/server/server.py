@@ -4,8 +4,8 @@ import tornado.websocket
 import json
 import logging
 import time
-from src.order_book.matching_engine import FIFOMatchingEngine
-from src.order_book.order_book import OrderBook
+
+from order_book.product_manager import TradingProductManager
 from src.order_book.order import Order
 from src.protocols.FIXProtocol import FIXProtocol
 
@@ -17,17 +17,9 @@ MSG_SEQ_NUM = 0
 ID = 0
 
 # Initialize order books and matching engines for multiple products
-order_books = {
-    "product1": OrderBook(),
-    "product2": OrderBook(),
-    # Add more products as needed
-}
+products = ["product1", "product2", "product3"]  # Add more products as needed
 
-matching_engines = {
-    "product1": FIFOMatchingEngine(order_books["product1"]),
-    "product2": FIFOMatchingEngine(order_books["product2"]),
-    # Add more products as needed
-}
+product_manager = TradingProductManager(products)
 protocol = FIXProtocol("server")
 
 def product_exists(product):
@@ -36,7 +28,7 @@ def product_exists(product):
     :param product: Product name
     :return: True if valid, False otherwise
     """
-    return product in order_books
+    return product in products
 
 
 class MainHandler(tornado.web.RequestHandler):
@@ -100,7 +92,7 @@ class TradingHandler(MsgHandler):
             message["order"]["price"]
         )
         ID += 1  # Increment order ID
-        status = matching_engines[product].match_order(order)  # Match order
+        status = product_manager.get_matching_engine(product).match_order(order) # Match order
         protocol.set_target(message["order"]["user"])  # Set target to user
         return protocol.encode({"order_id": order.id, "status": status, "msg_type": "ExecutionReport"})
 
@@ -116,10 +108,10 @@ class TradingHandler(MsgHandler):
         if not product_exists(product):
             return protocol.encode({"order_id": -1, "status": False, "msg_type": "ExecutionReportCancel"})
         order_id = message["order_id"]
-        order = order_books[product].get_order_by_id(order_id)
+        order = product_manager.get_order_book(product).get_order_by_id(order_id)
         if order is None:
             return protocol.encode({"order_id": order_id, "status": False, "msg_type": "ExecutionReportCancel"})
-        order_books[product].delete_order(order_id)
+        product_manager.get_order_book(product).delete_order(order_id)
         protocol.set_target(order.user)
         return protocol.encode({"order_id": order_id, "status": True, "msg_type": "ExecutionReportCancel"})
 
@@ -136,10 +128,10 @@ class TradingHandler(MsgHandler):
             return protocol.encode({"order_id": -1, "status": False, "msg_type": "ExecutionReportModify"})
         order_id = message["order_id"]
         quantity = message["quantity"]
-        order = order_books[product].get_order_by_id(order_id)
+        order = product_manager.get_order_book(product).get_order_by_id(order_id)
         if order is None:
             return protocol.encode({"order_id": order_id, "status": False, "msg_type": "ExecutionReportModify"})
-        ret = order_books[product].modify_order_qty(order_id, quantity)
+        ret = product_manager.get_order_book(product).modify_order_qty(order_id, quantity)
         protocol.set_target(order.user)
         return protocol.encode({"order_id": order_id, "status": ret, "msg_type": "ExecutionReportModify"})
 
@@ -169,7 +161,7 @@ class QuoteHandler(MsgHandler):
         product = message["product"]
         if not product_exists(product):
             return protocol.encode({"order": None, "msg_type": "OrderStatus"})
-        order_book = order_books[product]
+        order_book = product_manager.get_order_book(product)
         order_id = message["id"]
         order = order_book.get_order_by_id(order_id)
         protocol.set_target(message["sender"])
@@ -186,7 +178,7 @@ class QuoteHandler(MsgHandler):
         product = message["product"]
         if not product_exists(product):
             return protocol.encode({"order_book": None, "msg_type": "MarketDataSnapshot"})
-        order_book = order_books[product]
+        order_book = product_manager.get_order_book(product)
         order_book_data = order_book.jsonify_order_book()
         return protocol.encode({"order_book": order_book_data, "msg_type": "MarketDataSnapshot"})
 
@@ -199,9 +191,10 @@ class QuoteHandler(MsgHandler):
         """
         message = protocol.decode(message)
         product = message["product"]
+        print(product_manager.get_order_book(product).user_balance)
         if not product_exists(product):
             return protocol.encode({"user_orders": None, "msg_type": "UserOrderStatus"})
-        order_book = order_books[product]
+        order_book = product_manager.get_order_book(product)
         user_orders = order_book.get_orders_by_user(message["user"])
         user_orders = {order.id: order.__json__() for order in user_orders}
         protocol.set_target(message["user"])

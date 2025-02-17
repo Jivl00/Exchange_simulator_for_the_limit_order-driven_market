@@ -1,5 +1,5 @@
 import json
-
+from collections import defaultdict
 import pandas as pd
 from collections import deque
 from sortedcontainers import SortedDict
@@ -8,7 +8,7 @@ import logging
 
 class OrderBook:
     """
-    Order book class to store and manage orders.
+    Order book class to store and manage orders. Stores current state of the order book.
     """
 
     def __init__(self):
@@ -24,6 +24,8 @@ class OrderBook:
             'sell': self.asks
         }
 
+        self.user_balance = defaultdict(int)  # Key: User ID, Value: Balance (default 0)
+
     def reset_book(self):
         """
         Reset the order book to an empty state.
@@ -36,6 +38,9 @@ class OrderBook:
             'buy': self.bids,
             'sell': self.asks
         }
+
+        self.user_balance = defaultdict(int)
+
         logging.debug("ORDERBOOK: Order book reset.")
 
     def get_order_by_id(self, order_id):
@@ -168,6 +173,19 @@ class OrderBook:
         logging.debug(
             f"ORDERBOOK: Modified Order {order_id} ({order.side}): {order.quantity} shares at ${order.price:.2f}")
 
+    def modify_user_balance(self, user_id, amount, side):
+        """
+        Modify the balance of a user.
+        :param user_id: User ID
+        :param amount: Amount to modify the balance by
+        :param side: Side of the transaction ('buy' or 'sell')
+        :return: None
+        """
+        if side == 'buy':
+            self.user_balance[user_id] -= amount
+        elif side == 'sell':
+            self.user_balance[user_id] += amount
+
     def get_best_bid(self):
         """
         Return the best bid price. The best bid price is the highest price in the bids.
@@ -200,6 +218,14 @@ class OrderBook:
             if order.user == user_id:
                 user_orders.append(order)
         return user_orders
+
+    def get_user_balance(self, user_id):
+        """
+        Get the balance of a user.
+        :param user_id: User ID
+        :return: Balance of the user
+        """
+        return self.user_balance.get(user_id, 0) # Return 0 if user_id not found
 
     """
     -------------------------------
