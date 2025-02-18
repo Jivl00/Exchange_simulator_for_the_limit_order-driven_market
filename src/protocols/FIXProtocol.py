@@ -129,6 +129,32 @@ class FIXProtocol(IProtocol):
         message.append_pair(55, product) # Symbol (used as product name)
         return message
 
+    def UserBalanceRequest_encode(self, data):
+        """
+        Encode the UserBalanceRequest message.
+        :param data: Dictionary with product name
+        :return: simplefix.FixMessage object
+        """
+        product = data["product"]
+        message = self.fix_message_init()
+        message.append_pair(35, "BB", header=True)  # MsgType = CollateralInquiry
+        message.append_pair(55, product) # Symbol (used as product name)
+        return message
+
+    def CaptureReportRequest_encode(self, data):
+        """
+        Encode the CaptureReportRequest message.
+        :param data: Dictionary with product name
+        :return: simplefix.FixMessage object
+        """
+        product = data["product"]
+        message = self.fix_message_init()
+        message.append_pair(35, "AD", header=True)  # MsgType = TradeCaptureReportRequest
+        message.append_pair(55, product) # Symbol (used as product name)
+        message.append_pair(568, data["history_len"])  # TradeRequestID = History length (number of trades)
+        message.append_pair(569, 0)  # TradeRequestType = All trades
+        return message
+
     def OrderStatus_encode(self, data):
         """
         Encode the OrderStatus message.
@@ -232,6 +258,34 @@ class FIXProtocol(IProtocol):
         message.append_pair(58, json.dumps(orders))
         return message
 
+    def UserBalance_encode(self, data):
+        """
+        Encode the UserBalance message.
+        :param data: Dictionary with user balance
+        :return: simplefix.FixMessage object
+        """
+        balance = data["user_balance"]
+        message = self.fix_message_init()
+        message.append_pair(35, "BA") # MsgType = CollateralReport
+        # message.append_pair(908, 1) # Unused - simplification of FIX protocol
+        message.append_pair(910, 3) # CollStatus = Accepted
+        message.append_pair(58, json.dumps(balance))
+        return message
+
+    def CaptureReport_encode(self, data):
+        """
+        Encode the CaptureReport message.
+        :param data: Dictionary with trade history
+        :return: simplefix.FixMessage object
+        """
+        history = data["history"]
+        message = self.fix_message_init()
+        message.append_pair(35, "AE") # MsgType = TradeCaptureReport
+        # Body fields simplification - skipped some mandatory fields
+        message.append_pair(58, json.dumps(history))
+        return message
+
+
     def encode(self, msg_data):
         """
         Encode the incoming message to the FIX protocol.
@@ -246,6 +300,8 @@ class FIXProtocol(IProtocol):
             "OrderModifyRequestQty": lambda data: self.OrderModifyRequestQty_encode(data),
             "MarketDataRequest": lambda data: self.MarketDataRequest_encode(data),
             "UserOrderStatusRequest": lambda data: self.UserOrderStatusRequest_encode(data),
+            "UserBalanceRequest": lambda data: self.UserBalanceRequest_encode(data),
+            "CaptureReportRequest": lambda data: self.CaptureReportRequest_encode(data),
 
             # Server -> Client
             "OrderStatus": lambda data: self.OrderStatus_encode(data),
@@ -254,6 +310,8 @@ class FIXProtocol(IProtocol):
             "ExecutionReportModify": lambda data: self.ExecutionReportCancelReplace_encode(data),
             "MarketDataSnapshot": lambda data: self.MarketDataSnapshot_encode(data),
             "UserOrderStatus": lambda data: self.UserOrders_encode(data),
+            "UserBalance": lambda data: self.UserBalance_encode(data),
+            "CaptureReport": lambda data: self.CaptureReport_encode(data),
 
         }
         msg_type = msg_data["msg_type"]
@@ -353,6 +411,26 @@ class FIXProtocol(IProtocol):
         return {"user_orders": user_orders}
 
     @staticmethod
+    def UserBalance_decode(data):
+        """
+        Decode the UserBalance message.
+        :param data: FIX message
+        :return: Dictionary with user balance
+        """
+        balance = json.loads(data.get(58).decode())
+        return {"user_balance": balance}
+
+    @staticmethod
+    def CaptureReport_decode(data):
+        """
+        Decode the CaptureReport message.
+        :param data: FIX message
+        :return: Dictionary with trade history
+        """
+        history = json.loads(data.get(58).decode())
+        return {"history": history}
+
+    @staticmethod
     def NewOrderSingle_decode(data):
         """
         Decode the NewOrderSingle message.
@@ -413,6 +491,28 @@ class FIXProtocol(IProtocol):
         product = data.get(55).decode() # Symbol (used as product name)
         return {"user": user, "product": product}
 
+    @staticmethod
+    def UserBalanceRequest_decode(data):
+        """
+        Decode the UserBalanceRequest message.
+        :param data: FIX message
+        :return: Dictionary with product name
+        """
+        user = data.get(49).decode()
+        product = data.get(55).decode()  # Symbol (used as product name)
+        return {"user": user, "product": product}
+
+    @staticmethod
+    def CaptureReportRequest_decode(data):
+        """
+        Decode the CaptureReportRequest message.
+        :param data: FIX message
+        :return: Dictionary with product name
+        """
+        product = data.get(55).decode()  # Symbol (used as product name)
+        history_len = int(data.get(568).decode())
+        return {"product": product, "history_len": history_len}
+
     def decode(self, message):
         """
         Decode the incoming message from the FIX protocol.
@@ -429,6 +529,8 @@ class FIXProtocol(IProtocol):
             "ExecutionReportModify": lambda msg: self.ExecutionReportCancel_decode(msg),
             "MarketDataSnapshot": lambda msg: self.MarketDataSnapshot_decode(msg),
             "UserOrderStatus": lambda msg: self.UserOrders_decode(msg),
+            "UserBalance": lambda msg: self.UserBalance_decode(msg),
+            "CaptureReport": lambda msg: self.CaptureReport_decode(msg),
 
             # Server -> Client
             "OrderStatusRequest": lambda msg: self.OrderStatusRequest_decode(msg),
@@ -437,6 +539,8 @@ class FIXProtocol(IProtocol):
             "OrderModifyRequestQty": lambda msg: self.OrderModifyRequestQty_decode(msg),
             "MarketDataRequest": lambda msg: self.MarketDataRequest_decode(msg),
             "UserOrderStatusRequest": lambda msg: self.UserOrderStatusRequest_decode(msg),
+            "UserBalanceRequest": lambda msg: self.UserBalanceRequest_decode(msg),
+            "CaptureReportRequest": lambda msg: self.CaptureReportRequest_decode(msg),
 
 
         }

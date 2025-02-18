@@ -140,6 +140,21 @@ class Client:
         print(pd.DataFrame(data).T)
         return data
 
+    def user_balance(self, product):
+        """
+        Returns the user's balance for a specific product.
+        :param product: Product name
+        :return: JSON with user's balance
+        """
+        data = {"product": product, "msg_type": "UserBalanceRequest"}
+        message = self.PROTOCOL.encode(data)
+        response = requests.get(f"{self.BASE_URL}/{self.QUOTE_SESSION}", json={"message": message, "msg_type": data["msg_type"]})
+        response = response.json()
+        response["msg_type"] = "UserBalance"
+        data = self.PROTOCOL.decode(response)
+        print(f"User balance for {product}: {data['user_balance']}")
+        return data["user_balance"]
+
     @staticmethod
     def display_order_book(order_book_data, product=None):
         """

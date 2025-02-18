@@ -200,10 +200,31 @@ class QuoteHandler(MsgHandler):
         protocol.set_target(message["user"])
         return protocol.encode({"user_orders": user_orders, "msg_type": "UserOrderStatus"})
 
+    @staticmethod
+    def user_balance(message):
+        """
+        Returns records of the balance of a user.
+        :param message: client message with user ID
+        :return: server response
+        """
+        message = protocol.decode(message)
+        product = message["product"]
+        if not product_exists(product):
+            return protocol.encode({"user_balance": None, "msg_type": "UserBalance"})
+        historical_books = product_manager.historical_order_books[product]
+        user_balances = [
+            book.user_balance[message["user"]]
+            for book in historical_books
+            if message["user"] in book.user_balance
+        ]
+        protocol.set_target(message["user"])
+        return protocol.encode({"user_balance": user_balances, "msg_type": "UserBalance"})
+
     msg_type_handlers = {
         "OrderStatusRequest": lambda message: QuoteHandler.order_stats(message),
         "MarketDataRequest": lambda message: QuoteHandler.order_book_request(message),
-        "UserOrderStatusRequest": lambda message: QuoteHandler.user_data(message)
+        "UserOrderStatusRequest": lambda message: QuoteHandler.user_data(message),
+        "UserBalanceRequest": lambda message: QuoteHandler.user_balance(message)
     }
 
     def get(self):

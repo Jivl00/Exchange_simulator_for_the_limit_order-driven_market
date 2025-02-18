@@ -4,6 +4,7 @@ import pandas as pd
 from collections import deque
 from sortedcontainers import SortedDict
 import logging
+import copy
 
 
 class OrderBook:
@@ -25,6 +26,21 @@ class OrderBook:
         }
 
         self.user_balance = defaultdict(int)  # Key: User ID, Value: Balance (default 0)
+
+    # def __copy__(self):
+    #     """
+    #     Copy the order book.
+    #     :return: Copy of the order book
+    #     """
+    #     copy = OrderBook()
+    #     copy.bids = self.bids.copy()
+    #     copy.asks = self.asks.copy()
+    #     copy.order_map = self.order_map.copy()
+    #     copy.user_balance = self.user_balance.copy()
+    #     return copy
+
+    def copy(self):
+        return copy.deepcopy(self)
 
     def reset_book(self):
         """
