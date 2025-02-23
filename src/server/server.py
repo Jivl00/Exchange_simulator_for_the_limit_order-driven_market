@@ -108,7 +108,7 @@ class TradingHandler(MsgHandler):
         if not product_exists(product):
             return protocol.encode({"order_id": -1, "status": False, "msg_type": "ExecutionReportCancel"})
         order_id = message["order_id"]
-        order = product_manager.get_order_book(product).get_order_by_id(order_id)
+        order = product_manager.get_order_book(product, False).get_order_by_id(order_id)
         if order is None:
             return protocol.encode({"order_id": order_id, "status": False, "msg_type": "ExecutionReportCancel"})
         product_manager.get_order_book(product).delete_order(order_id)
@@ -128,7 +128,7 @@ class TradingHandler(MsgHandler):
             return protocol.encode({"order_id": -1, "status": False, "msg_type": "ExecutionReportModify"})
         order_id = message["order_id"]
         quantity = message["quantity"]
-        order = product_manager.get_order_book(product).get_order_by_id(order_id)
+        order = product_manager.get_order_book(product, False).get_order_by_id(order_id)
         if order is None:
             return protocol.encode({"order_id": order_id, "status": False, "msg_type": "ExecutionReportModify"})
         ret = product_manager.get_order_book(product).modify_order_qty(order_id, quantity)
@@ -161,7 +161,7 @@ class QuoteHandler(MsgHandler):
         product = message["product"]
         if not product_exists(product):
             return protocol.encode({"order": None, "msg_type": "OrderStatus"})
-        order_book = product_manager.get_order_book(product)
+        order_book = product_manager.get_order_book(product, False)
         order_id = message["id"]
         order = order_book.get_order_by_id(order_id)
         protocol.set_target(message["sender"])
@@ -178,7 +178,7 @@ class QuoteHandler(MsgHandler):
         product = message["product"]
         if not product_exists(product):
             return protocol.encode({"order_book": None, "msg_type": "MarketDataSnapshot"})
-        order_book = product_manager.get_order_book(product)
+        order_book = product_manager.get_order_book(product, False)
         order_book_data = order_book.jsonify_order_book()
         return protocol.encode({"order_book": order_book_data, "msg_type": "MarketDataSnapshot"})
 
@@ -191,10 +191,10 @@ class QuoteHandler(MsgHandler):
         """
         message = protocol.decode(message)
         product = message["product"]
-        print(product_manager.get_order_book(product).user_balance)
+        print(product_manager.get_order_book(product, False).user_balance)
         if not product_exists(product):
             return protocol.encode({"user_orders": None, "msg_type": "UserOrderStatus"})
-        order_book = product_manager.get_order_book(product)
+        order_book = product_manager.get_order_book(product, False)
         user_orders = order_book.get_orders_by_user(message["user"])
         user_orders = {order.id: order.__json__() for order in user_orders}
         protocol.set_target(message["user"])
@@ -217,14 +217,34 @@ class QuoteHandler(MsgHandler):
             for book in historical_books
             if message["user"] in book.user_balance
         ]
+        # Add current balance
+        user_balances.append(product_manager.get_order_book(product, False).user_balance[message["user"]])
         protocol.set_target(message["user"])
         return protocol.encode({"user_balance": user_balances, "msg_type": "UserBalance"})
+
+    @staticmethod
+    def get_report(message):
+        """
+        Returns the report of the trading session.
+        :param message: client message with product name
+        :return: server response
+        """
+        message = protocol.decode(message)
+        product = message["product"]
+        if not product_exists(product):
+            return protocol.encode({"report": None, "msg_type": "CaptureReport"})
+        report = product_manager.get_historical_order_books(product, message["history_len"])
+        # Add current order book to the historical report
+        report.append(product_manager.get_order_book(product, False).copy())
+        return protocol.encode({"history": report, "msg_type": "CaptureReport"})
+
 
     msg_type_handlers = {
         "OrderStatusRequest": lambda message: QuoteHandler.order_stats(message),
         "MarketDataRequest": lambda message: QuoteHandler.order_book_request(message),
         "UserOrderStatusRequest": lambda message: QuoteHandler.user_data(message),
-        "UserBalanceRequest": lambda message: QuoteHandler.user_balance(message)
+        "UserBalanceRequest": lambda message: QuoteHandler.user_balance(message),
+        "CaptureReportRequest": lambda message: QuoteHandler.get_report(message)
     }
 
     def get(self):

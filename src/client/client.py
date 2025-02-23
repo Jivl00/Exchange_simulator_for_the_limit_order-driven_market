@@ -1,3 +1,5 @@
+import json
+
 import requests
 import pandas as pd
 from src.protocols.FIXProtocol import FIXProtocol
@@ -144,7 +146,7 @@ class Client:
         """
         Returns the user's balance for a specific product.
         :param product: Product name
-        :return: JSON with user's balance
+        :return: array with user's balance
         """
         data = {"product": product, "msg_type": "UserBalanceRequest"}
         message = self.PROTOCOL.encode(data)
@@ -154,6 +156,27 @@ class Client:
         data = self.PROTOCOL.decode(response)
         print(f"User balance for {product}: {data['user_balance']}")
         return data["user_balance"]
+
+    def historical_order_books(self, product, history_length):
+        """
+        Returns the historical order books for a specific product.
+        :param product: Product name
+        :param history_length: Number of historical order books to return + 1 (current order book)
+        :return: historical order books
+        """
+        data = {"product": product, "history_len": history_length, "msg_type": "CaptureReportRequest"}
+        message = self.PROTOCOL.encode(data)
+        response = requests.get(f"{self.BASE_URL}/{self.QUOTE_SESSION}", json={"message": message, "msg_type": data["msg_type"]})
+        response = response.json()
+        response["msg_type"] = "CaptureReport"
+        data = self.PROTOCOL.decode(response)
+        print(f"Historical order books for {product}:")
+        for i, order_book in enumerate(data["history"]):
+            print(f"Order book {i}:")
+            print("=====================================")
+            self.display_order_book(json.loads(order_book), product)
+            print()
+        return data["history"]
 
     @staticmethod
     def display_order_book(order_book_data, product=None):

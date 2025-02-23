@@ -282,7 +282,10 @@ class FIXProtocol(IProtocol):
         message = self.fix_message_init()
         message.append_pair(35, "AE") # MsgType = TradeCaptureReport
         # Body fields simplification - skipped some mandatory fields
-        message.append_pair(58, json.dumps(history))
+
+        # Transformed to JSON for simplicity
+        historical_order_books = [order_book.jsonify_order_book() for order_book in history]
+        message.append_pair(58, json.dumps(historical_order_books))
         return message
 
 
