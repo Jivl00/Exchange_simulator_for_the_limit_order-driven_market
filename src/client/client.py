@@ -179,10 +179,11 @@ class Client:
         return data["history"]
 
     @staticmethod
-    def display_order_book(order_book_data, product=None):
+    def display_order_book(order_book_data, aggregated=False, product=None):
         """
         Display the order book in a human-readable format. For debugging purposes.
         :param order_book_data: JSON with order book data
+        :param aggregated: If True, display aggregated order book
         :param product: Product name
         :return: None
         """
@@ -192,8 +193,26 @@ class Client:
         if order_book_data is None:
             print(f"\033[91mError: Order book for {product} not found.\033[0m")
             return
+
         bids_df = pd.DataFrame(order_book_data['Bids'])
         asks_df = pd.DataFrame(order_book_data['Asks'])
+
+        if bids_df.empty and asks_df.empty:
+            print("Order book is empty.")
+            return
+
+        if aggregated:
+            print("Aggregated order book:")
+            print("Bids DataFrame columns:", bids_df.columns)
+            print("Asks DataFrame columns:", asks_df.columns)
+
+            # Aggregate the order book
+            if not bids_df.empty:
+                bids_df = bids_df.groupby('Price', as_index=False).agg(
+                    {'Quantity': 'sum', 'ID': 'count', 'User': 'first'})
+            if not asks_df.empty:
+                asks_df = asks_df.groupby('Price', as_index=False).agg(
+                    {'Quantity': 'sum', 'ID': 'count', 'User': 'first'})
 
         # Concatenate bids and asks DataFrames side by side
         order_book_df = pd.concat([bids_df, asks_df], axis=1, keys=['Bids', 'Asks'])
