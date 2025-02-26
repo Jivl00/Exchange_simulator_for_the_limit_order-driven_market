@@ -1,11 +1,86 @@
 import json
-
+import asyncio
+import threading
 import requests
 import pandas as pd
+from tornado.ioloop import IOLoop, PeriodicCallback
+from tornado.websocket import websocket_connect
 from src.protocols.FIXProtocol import FIXProtocol
 
 
-class Client:
+class Subscriber:
+    """
+    Subscriber class for subscribing to the trading server for updates on orders and trades.
+    """
+    def __init__(self, url, protocol, timeout=1):
+        """
+        Initialize the subscriber.
+        :param url: URL to connect to
+        :param protocol: Protocol object for encoding and decoding messages
+        :param timeout: Timeout in seconds for maintaining the connection (heartbeats)
+        """
+        self.url = url
+        self.protocol = protocol
+        self.loop = IOLoop.instance()
+        self.ws = None
+        self.thread = None
+        asyncio.ensure_future(self.connect())
+        timeout = timeout * 1000  # to seconds
+        PeriodicCallback(self.maintain_connection, timeout).start()
+
+    def start_subscribe(self):
+        """
+        Start the subscription loop.
+        """
+        if self.thread is None:
+            self.thread = threading.Thread(target=self.loop.start)
+            self.thread.start()
+
+
+    def stop_subscribe(self):
+        """
+        Stop the subscription loop.
+        """
+        if self.thread is not None:
+            self.loop.stop()
+            self.thread.join()
+            self.thread = None
+
+    async def connect(self):
+        """
+        Connect to the server via WebSocket.
+        """
+        try:
+            self.ws = await websocket_connect(self.url)
+        except Exception as e:
+            print(f"Connection error: {e}")
+        else:
+            print("Subscription successful")
+            await self.subscribe()
+
+    async def maintain_connection(self):
+        """
+        Send a heartbeat message to the server to maintain the connection.
+        """
+        if self.ws is None:
+            await self.connect()
+        else:
+            await self.ws.write_message("Heartbeat")
+
+    async def subscribe(self):
+        """
+        Subscribe to the server for updates.
+        """
+        while True: # Keep the connection open
+            msg = await self.ws.read_message()
+            if msg is None:
+                print("Connection closed")
+                self.ws = None
+                break
+            print(f"Message received: {msg}")
+
+
+class Trader:
     """
     Client class for communicating with the trading server.
     """
@@ -22,7 +97,19 @@ class Client:
         self.QUOTE_SESSION = config["QUOTE_SESSION"]
 
         self.PROTOCOL = FIXProtocol(sender, target)
+        self.subscriber = Subscriber(f"ws://{config['HOST'].replace('http://', '')}:{config['PORT']}/websocket",
+                                     self.PROTOCOL)
+    def start_subscribe(self):
+        """
+        Start the subscription loop.
+        """
+        self.subscriber.start_subscribe()
 
+    def stop_subscribe(self):
+        """
+        Stop the subscription loop.
+        """
+        self.subscriber.stop_subscribe()
 
     def order_stats(self, ID, product):
         """
@@ -34,7 +121,8 @@ class Client:
         data = {"ID": ID, "product": product, "msg_type": "OrderStatusRequest"}
         message = self.PROTOCOL.encode(data)
 
-        response = requests.get(f"{self.BASE_URL}/{self.QUOTE_SESSION}", json={"message": message, "msg_type": data["msg_type"]})
+        response = requests.get(f"{self.BASE_URL}/{self.QUOTE_SESSION}",
+                                json={"message": message, "msg_type": data["msg_type"]})
         response = response.json()
         response["msg_type"] = "OrderStatus"
         order = self.PROTOCOL.decode(response)
@@ -50,7 +138,8 @@ class Client:
         data = {"order": order, "product": product, "msg_type": "NewOrderSingle"}
         message = self.PROTOCOL.encode(data)
 
-        response = requests.post(f"{self.BASE_URL}/{self.TRADING_SESSION}", json={"message": message, "msg_type": data["msg_type"]})
+        response = requests.post(f"{self.BASE_URL}/{self.TRADING_SESSION}",
+                                 json={"message": message, "msg_type": data["msg_type"]})
         response = response.json()
         response["msg_type"] = "ExecutionReport"
         response_data = self.PROTOCOL.decode(response)
@@ -58,6 +147,7 @@ class Client:
             print("\033[91mError: Order put failed.\033[0m")  # Print in red
 
         return response_data["order_id"] if response_data["status"] else None
+
     def delete_order(self, ID, product):
         """
         Send an order cancel request to the server.
@@ -68,7 +158,8 @@ class Client:
         data = {"ID": ID, "product": product, "msg_type": "OrderCancelRequest"}
         message = self.PROTOCOL.encode(data)
 
-        response = requests.post(f"{self.BASE_URL}/{self.TRADING_SESSION}", json={"message": message, "msg_type": data["msg_type"]})
+        response = requests.post(f"{self.BASE_URL}/{self.TRADING_SESSION}",
+                                 json={"message": message, "msg_type": data["msg_type"]})
         response = response.json()
         response["msg_type"] = "ExecutionReportCancel"
         response_data = self.PROTOCOL.decode(response)
@@ -84,7 +175,8 @@ class Client:
         """
         data = {"ID": ID, "quantity": quantity, "product": product, "msg_type": "OrderModifyRequestQty"}
         message = self.PROTOCOL.encode(data)
-        response = requests.post(f"{self.BASE_URL}/{self.TRADING_SESSION}", json={"message": message, "msg_type": data["msg_type"]})
+        response = requests.post(f"{self.BASE_URL}/{self.TRADING_SESSION}",
+                                 json={"message": message, "msg_type": data["msg_type"]})
         response = response.json()
         response["msg_type"] = "ExecutionReportModify"
         response_data = self.PROTOCOL.decode(response)
@@ -119,7 +211,8 @@ class Client:
         """
         data = {"depth": depth, "product": product, "msg_type": "MarketDataRequest"}
         message = self.PROTOCOL.encode(data)
-        response = requests.get(f"{self.BASE_URL}/{self.QUOTE_SESSION}", json={"message": message, "msg_type": data["msg_type"]})
+        response = requests.get(f"{self.BASE_URL}/{self.QUOTE_SESSION}",
+                                json={"message": message, "msg_type": data["msg_type"]})
         order_book_data = response.json()
         order_book_data["msg_type"] = "MarketDataSnapshot"
         order_book_data = self.PROTOCOL.decode(order_book_data)["order_book"]
@@ -134,7 +227,8 @@ class Client:
         """
         data = {"product": product, "msg_type": "UserOrderStatusRequest"}
         message = self.PROTOCOL.encode(data)
-        response = requests.get(f"{self.BASE_URL}/{self.QUOTE_SESSION}", json={"message": message, "msg_type": data["msg_type"]})
+        response = requests.get(f"{self.BASE_URL}/{self.QUOTE_SESSION}",
+                                json={"message": message, "msg_type": data["msg_type"]})
         response = response.json()
         response["msg_type"] = "UserOrderStatus"
         data = self.PROTOCOL.decode(response)
@@ -150,7 +244,8 @@ class Client:
         """
         data = {"product": product, "msg_type": "UserBalanceRequest"}
         message = self.PROTOCOL.encode(data)
-        response = requests.get(f"{self.BASE_URL}/{self.QUOTE_SESSION}", json={"message": message, "msg_type": data["msg_type"]})
+        response = requests.get(f"{self.BASE_URL}/{self.QUOTE_SESSION}",
+                                json={"message": message, "msg_type": data["msg_type"]})
         response = response.json()
         response["msg_type"] = "UserBalance"
         data = self.PROTOCOL.decode(response)
@@ -166,7 +261,8 @@ class Client:
         """
         data = {"product": product, "history_len": history_length, "msg_type": "CaptureReportRequest"}
         message = self.PROTOCOL.encode(data)
-        response = requests.get(f"{self.BASE_URL}/{self.QUOTE_SESSION}", json={"message": message, "msg_type": data["msg_type"]})
+        response = requests.get(f"{self.BASE_URL}/{self.QUOTE_SESSION}",
+                                json={"message": message, "msg_type": data["msg_type"]})
         response = response.json()
         response["msg_type"] = "CaptureReport"
         data = self.PROTOCOL.decode(response)
@@ -174,7 +270,7 @@ class Client:
         for i, order_book in enumerate(data["history"]):
             print(f"Order book {i}:")
             print("=====================================")
-            self.display_order_book(json.loads(order_book), product)
+            self.display_order_book(json.loads(order_book), product=product)
             print()
         return data["history"]
 

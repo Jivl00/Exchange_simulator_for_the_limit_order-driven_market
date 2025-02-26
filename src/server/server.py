@@ -94,7 +94,11 @@ class TradingHandler(MsgHandler):
         ID += 1  # Increment order ID
         status = product_manager.get_matching_engine(product).match_order(order) # Match order
         protocol.set_target(message["order"]["user"])  # Set target to user
-        return protocol.encode({"order_id": order.id, "status": status, "msg_type": "ExecutionReport"})
+        response = protocol.encode({"order_id": order.id, "status": status, "msg_type": "ExecutionReport"})
+
+        # Broadcast the order book to all clients
+        WebSocketHandler.broadcast(response)
+        return response
 
     @staticmethod
     def delete_order(message):
@@ -255,11 +259,48 @@ class QuoteHandler(MsgHandler):
         self.handle_msg()
 
 
+class WebSocketHandler(tornado.websocket.WebSocketHandler):
+    """
+    Websocket handler for message exchange between the server and the client.
+    """
+    clients = set()
+
+    def open(self):
+        """
+        Handles new WebSocket connections - adds the client to the subscribed clients.
+        """
+        self.clients.add(self)
+        logging.info("New WebSocket connection")
+    def on_close(self):
+        """
+        Handles WebSocket connection close - removes the client from the subscribed clients.
+        """
+        self.clients.remove(self)
+        logging.info("WebSocket connection closed")
+
+    def on_message(self, message):
+        """
+        Handles messages from the client.
+        """
+        # pass
+        self.write_message(f">{message}")
+
+    @classmethod
+    def broadcast(cls, message):
+        """
+        Broadcasts a message to all subscribed clients.
+        :param message: message to broadcast
+        """
+        for client in cls.clients:
+            client.write_message(message)
+
+
 def make_app():
     return tornado.web.Application([
         (r"/", MainHandler),
         (f"/{config['TRADING_SESSION']}", TradingHandler),
         (f"/{config['QUOTE_SESSION']}", QuoteHandler),
+        (r"/websocket", WebSocketHandler),
     ], debug=True, autoreload=True)
 
 
