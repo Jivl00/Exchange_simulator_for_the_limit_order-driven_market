@@ -77,7 +77,12 @@ class Subscriber:
                 print("Connection closed")
                 self.ws = None
                 break
-            print(f"Message received: {msg}")
+            if msg == ">Heartbeat":
+                continue
+            order_book_data = json.loads(msg)
+            order_book_data["msg_type"] = "MarketDataSnapshot"
+            order_book_data = self.protocol.decode(order_book_data)["order_book"]
+            Trader.display_order_book(order_book_data)
 
 
 class Trader:

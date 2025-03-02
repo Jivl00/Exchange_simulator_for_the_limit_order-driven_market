@@ -85,7 +85,7 @@ class FIFOMatchingEngine:
                 self.order_book.modify_user_balance(best_counter_order.user, price * new_order.quantity, counter_side)
                 self.order_book.modify_order_qty(best_counter_order.id, new_quantity=best_counter_order.quantity)
                 new_order.quantity = 0
-                print("FULL MATCH")
+                # print("FULL MATCH")
                 logging.info(
                     f"MATCH: Full match between order {new_order.id} and order {best_counter_order.id} at price {price}")
             elif best_counter_order.quantity == new_order.quantity:  # Full match
@@ -94,7 +94,7 @@ class FIFOMatchingEngine:
                                                     counter_side)
                 self.order_book.delete_best_order(counter_side, price)
                 new_order.quantity = 0
-                print("FULL MATCH")
+                # print("FULL MATCH")
                 logging.info(
                     f"MATCH: Full match between order {new_order.id} and order {best_counter_order.id} at price {price}")
             else:  # Partial match
@@ -103,6 +103,6 @@ class FIFOMatchingEngine:
                 self.order_book.modify_user_balance(best_counter_order.user, price * best_counter_order.quantity,
                                                     counter_side)
                 self.order_book.delete_best_order(counter_side, price)
-                print("PARTIAL MATCH")
+                # print("PARTIAL MATCH")
                 logging.info(
                     f"MATCH: Partial match between order {new_order.id} and order {best_counter_order.id} at price {price}")

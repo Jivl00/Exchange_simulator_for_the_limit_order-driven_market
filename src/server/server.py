@@ -97,7 +97,8 @@ class TradingHandler(MsgHandler):
         response = protocol.encode({"order_id": order.id, "status": status, "msg_type": "ExecutionReport"})
 
         # Broadcast the order book to all clients
-        WebSocketHandler.broadcast(response)
+        broadcast_response = protocol.encode({"order_book": product_manager.get_order_book(product, False).jsonify_order_book(), "msg_type": "MarketDataSnapshot"})
+        WebSocketHandler.broadcast(broadcast_response)
         return response
 
     @staticmethod
@@ -195,7 +196,6 @@ class QuoteHandler(MsgHandler):
         """
         message = protocol.decode(message)
         product = message["product"]
-        print(product_manager.get_order_book(product, False).user_balance)
         if not product_exists(product):
             return protocol.encode({"user_orders": None, "msg_type": "UserOrderStatus"})
         order_book = product_manager.get_order_book(product, False)
@@ -229,7 +229,7 @@ class QuoteHandler(MsgHandler):
     @staticmethod
     def get_report(message):
         """
-        Returns the report of the trading session.
+        Returns the historical report of the trading session.
         :param message: client message with product name
         :return: server response
         """
@@ -292,6 +292,7 @@ class WebSocketHandler(tornado.websocket.WebSocketHandler):
         :param message: message to broadcast
         """
         for client in cls.clients:
+            message = {"message": message.decode()}
             client.write_message(message)
 
 

@@ -6,7 +6,6 @@ import json
 config = json.load(open("config/server_config.json"))
 manual_agent = Trader("manual_agent", "server", config)
 manual_agent.start_subscribe()
-time.sleep(5)
 manual_agent.stop_subscribe()
 manual_agent2 = Trader("manual_agent2", "server", config)
 
