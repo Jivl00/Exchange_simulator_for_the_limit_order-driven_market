@@ -1,13 +1,9 @@
-import time
-
-from src.client.client import Trader
+from src.client.algorithmic_trader import AlgorithmicTrader
 import json
 
 config = json.load(open("config/server_config.json"))
-manual_agent = Trader("manual_agent", "server", config)
-manual_agent.start_subscribe()
-manual_agent.stop_subscribe()
-manual_agent2 = Trader("manual_agent2", "server", config)
+manual_agent = AlgorithmicTrader("manual_agent", "server", config)
+manual_agent2 = AlgorithmicTrader("manual_agent2", "server", config)
 
 product1 = "product1"
 product2 = "product2"

@@ -1,14 +1,14 @@
 import json
 import asyncio
-import threading
 import requests
 import pandas as pd
+from abc import ABC, abstractmethod
 from tornado.ioloop import IOLoop, PeriodicCallback
 from tornado.websocket import websocket_connect
 from src.protocols.FIXProtocol import FIXProtocol
 
 
-class Subscriber:
+class Subscriber(ABC):
     """
     Subscriber class for subscribing to the trading server for updates on orders and trades.
     """
@@ -23,7 +23,6 @@ class Subscriber:
         self.protocol = protocol
         self.loop = IOLoop.instance()
         self.ws = None
-        self.thread = None
         asyncio.ensure_future(self.connect())
         timeout = timeout * 1000  # to seconds
         PeriodicCallback(self.maintain_connection, timeout).start()
@@ -32,19 +31,7 @@ class Subscriber:
         """
         Start the subscription loop.
         """
-        if self.thread is None:
-            self.thread = threading.Thread(target=self.loop.start)
-            self.thread.start()
-
-
-    def stop_subscribe(self):
-        """
-        Stop the subscription loop.
-        """
-        if self.thread is not None:
-            self.loop.stop()
-            self.thread.join()
-            self.thread = None
+        self.loop.start()
 
     async def connect(self):
         """
@@ -79,13 +66,32 @@ class Subscriber:
                 break
             if msg == ">Heartbeat":
                 continue
-            order_book_data = json.loads(msg)
-            order_book_data["msg_type"] = "MarketDataSnapshot"
-            order_book_data = self.protocol.decode(order_book_data)["order_book"]
-            Trader.display_order_book(order_book_data)
+            data = json.loads(msg)
+            data["msg_type"] = "MarketDataSnapshot"
+            data = self.protocol.decode(data)
+            product = data["product"]
+            order_book_data = data["order_book"]
+            Trader.display_order_book(order_book_data, product=product)
+            self.receive_market_data(data)
+
+    @abstractmethod
+    def receive_market_data(self, data):
+        """
+        Handle market data received from the server.
+        :param data: JSON with market data
+        """
+        pass
+
+    def __del__(self):
+        """
+        Destructor - close the WebSocket connection.
+        """
+        if self.ws is not None:
+            self.ws.close()
 
 
-class Trader:
+
+class Trader (Subscriber, ABC):
     """
     Client class for communicating with the trading server.
     """
@@ -97,24 +103,11 @@ class Trader:
         :param target: Target ID (Server ID)
         :param config: Configuration dictionary with server details, e.g. HOST, PORT, TRADING_SESSION, QUOTE_SESSION
         """
+        self.PROTOCOL = FIXProtocol(sender, target)
+        super().__init__(f"ws://{config['HOST'].replace('http://', '')}:{config['PORT']}/websocket", self.PROTOCOL)
         self.BASE_URL = f"{config['HOST']}:{config['PORT']}"
         self.TRADING_SESSION = config["TRADING_SESSION"]
         self.QUOTE_SESSION = config["QUOTE_SESSION"]
-
-        self.PROTOCOL = FIXProtocol(sender, target)
-        self.subscriber = Subscriber(f"ws://{config['HOST'].replace('http://', '')}:{config['PORT']}/websocket",
-                                     self.PROTOCOL)
-    def start_subscribe(self):
-        """
-        Start the subscription loop.
-        """
-        self.subscriber.start_subscribe()
-
-    def stop_subscribe(self):
-        """
-        Stop the subscription loop.
-        """
-        self.subscriber.stop_subscribe()
 
     def order_stats(self, ID, product):
         """

@@ -240,8 +240,10 @@ class FIXProtocol(IProtocol):
         :return: simplefix.FixMessage object
         """
         order_book = data["order_book"]
+        product = data["product"]
         message = self.fix_message_init()
         message.append_pair(35, "W")
+        message.append_pair(55, product) # Symbol (used as product name)
         message.append_pair(58, json.dumps(order_book)) # Simplification of FIX protocol
         return message
 
@@ -387,9 +389,10 @@ class FIXProtocol(IProtocol):
         :return: Dictionary with order book
         """
         order_book = json.loads(data.get(58).decode())
+        product = data.get(55).decode() # Symbol (used as product name)
         if isinstance(order_book, str):
             order_book = json.loads(order_book)
-        return {"order_book": order_book}
+        return {"order_book": order_book, "product": product}
 
     @staticmethod
     def OrderStatusRequest_decode(data):

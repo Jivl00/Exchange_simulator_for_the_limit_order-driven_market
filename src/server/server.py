@@ -100,7 +100,7 @@ class TradingHandler(MsgHandler):
         # Broadcast the order book to all clients
         broadcast_response = protocol.encode(
             {"order_book": product_manager.get_order_book(product, False).jsonify_order_book(),
-             "msg_type": "MarketDataSnapshot"})
+             "product": product, "msg_type": "MarketDataSnapshot"})
         WebSocketHandler.broadcast(broadcast_response)
         return response
 
@@ -185,10 +185,10 @@ class QuoteHandler(MsgHandler):
         message = protocol.decode(message)
         product = message["product"]
         if not product_exists(product):
-            return protocol.encode({"order_book": None, "msg_type": "MarketDataSnapshot"})
+            return protocol.encode({"order_book": None, "product":product, "msg_type": "MarketDataSnapshot"})
         order_book = product_manager.get_order_book(product, False)
         order_book_data = order_book.jsonify_order_book()
-        return protocol.encode({"order_book": order_book_data, "msg_type": "MarketDataSnapshot"})
+        return protocol.encode({"order_book": order_book_data, "product":product, "msg_type": "MarketDataSnapshot"})
 
     @staticmethod
     def user_data(message):
@@ -295,8 +295,8 @@ class WebSocketHandler(tornado.websocket.WebSocketHandler):
         Broadcasts a message to all subscribed clients.
         :param message: message to broadcast
         """
+        message = {"message": message.decode()}
         for client in cls.clients:
-            message = {"message": message.decode()}
             client.write_message(message)
 
 
