@@ -25,7 +25,8 @@ class OrderBook:
             'sell': self.asks
         }
 
-        self.user_balance = defaultdict(int)  # Key: User ID, Value: Balance (default 0)
+        self.user_balance = defaultdict(lambda: {'balance': 0, 'volume': 0})  # Key: User ID
+        self.timestamp = 0 # Timestamp in which the order book was last saved
 
     def copy(self):
         return copy.deepcopy(self)
@@ -43,7 +44,7 @@ class OrderBook:
             'sell': self.asks
         }
 
-        self.user_balance = defaultdict(int)
+        self.user_balance = defaultdict(lambda: {'balance': 0, 'volume': 0})
 
         logging.debug("ORDERBOOK: Order book reset.")
 
@@ -177,18 +178,21 @@ class OrderBook:
         logging.debug(
             f"ORDERBOOK: Modified Order {order_id} ({order.side}): {order.quantity} shares at ${order.price:.2f}")
 
-    def modify_user_balance(self, user_id, amount, side):
+    def modify_user_balance(self, user_id, amount, volume, side):
         """
         Modify the balance of a user.
         :param user_id: User ID
         :param amount: Amount to modify the balance by
+        :param volume: Volume to modify the balance by
         :param side: Side of the transaction ('buy' or 'sell')
         :return: None
         """
         if side == 'buy':
-            self.user_balance[user_id] -= amount
+            self.user_balance[user_id]['balance'] -= amount
+            self.user_balance[user_id]['volume'] += volume
         elif side == 'sell':
-            self.user_balance[user_id] += amount
+            self.user_balance[user_id]['balance'] += amount
+            self.user_balance[user_id]['volume'] -= volume
 
     def get_best_bid(self):
         """
@@ -229,7 +233,7 @@ class OrderBook:
         :param user_id: User ID
         :return: Balance of the user
         """
-        return self.user_balance.get(user_id, 0) # Return 0 if user_id not found
+        return self.user_balance.get(user_id, {'balance': 0, 'volume': 0}) # Return 0 if user not found
 
     """
     -------------------------------
@@ -262,7 +266,8 @@ class OrderBook:
 
         order_book_data = {
             'Bids': bids,
-            'Asks': asks
+            'Asks': asks,
+            'Timestamp': self.timestamp
         }
 
         return json.dumps(order_book_data)

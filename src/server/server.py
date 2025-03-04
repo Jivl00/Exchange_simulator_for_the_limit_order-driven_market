@@ -22,6 +22,7 @@ products = ["product1", "product2", "product3"]  # Add more products as needed
 product_manager = TradingProductManager(products)
 protocol = FIXProtocol("server")
 
+
 def product_exists(product):
     """
     Check if the product is valid.
@@ -38,7 +39,6 @@ class MainHandler(tornado.web.RequestHandler):
 
     def get(self):
         self.write("This is the trading server")
-
 
 
 class MsgHandler(tornado.web.RequestHandler):
@@ -58,7 +58,7 @@ class MsgHandler(tornado.web.RequestHandler):
         logging.info(f"R> {message['message']}")
         msg_type = message["msg_type"]
 
-        handler = self.msg_type_handlers.get(msg_type) # Call appropriate handler
+        handler = self.msg_type_handlers.get(msg_type)  # Call appropriate handler
         if not handler:
             self.set_status(400)
             self.write({"error": f"Unknown message type: {msg_type}"})
@@ -83,21 +83,24 @@ class TradingHandler(MsgHandler):
         product = message["product"]
         if not product_exists(product):
             return protocol.encode({"order_id": -1, "status": False, "msg_type": "ExecutionReport"})
+        timestamp = time.time_ns()
         order = Order(
             str(ID),  # Order ID
-            time.time_ns(),  # Timestamp in nanoseconds
+            timestamp,  # Timestamp in nanoseconds
             message["order"]["user"],
             message["order"]["side"],
             message["order"]["quantity"],
             message["order"]["price"]
         )
         ID += 1  # Increment order ID
-        status = product_manager.get_matching_engine(product).match_order(order) # Match order
+        status = product_manager.get_matching_engine(product, timestamp).match_order(order)  # Match order
         protocol.set_target(message["order"]["user"])  # Set target to user
         response = protocol.encode({"order_id": order.id, "status": status, "msg_type": "ExecutionReport"})
 
         # Broadcast the order book to all clients
-        broadcast_response = protocol.encode({"order_book": product_manager.get_order_book(product, False).jsonify_order_book(), "msg_type": "MarketDataSnapshot"})
+        broadcast_response = protocol.encode(
+            {"order_book": product_manager.get_order_book(product, False).jsonify_order_book(),
+             "msg_type": "MarketDataSnapshot"})
         WebSocketHandler.broadcast(broadcast_response)
         return response
 
@@ -116,7 +119,7 @@ class TradingHandler(MsgHandler):
         order = product_manager.get_order_book(product, False).get_order_by_id(order_id)
         if order is None:
             return protocol.encode({"order_id": order_id, "status": False, "msg_type": "ExecutionReportCancel"})
-        product_manager.get_order_book(product).delete_order(order_id)
+        product_manager.get_order_book(product, time.time_ns()).delete_order(order_id)
         protocol.set_target(order.user)
         return protocol.encode({"order_id": order_id, "status": True, "msg_type": "ExecutionReportCancel"})
 
@@ -136,7 +139,7 @@ class TradingHandler(MsgHandler):
         order = product_manager.get_order_book(product, False).get_order_by_id(order_id)
         if order is None:
             return protocol.encode({"order_id": order_id, "status": False, "msg_type": "ExecutionReportModify"})
-        ret = product_manager.get_order_book(product).modify_order_qty(order_id, quantity)
+        ret = product_manager.get_order_book(product, time.time_ns()).modify_order_qty(order_id, quantity)
         protocol.set_target(order.user)
         return protocol.encode({"order_id": order_id, "status": ret, "msg_type": "ExecutionReportModify"})
 
@@ -217,12 +220,13 @@ class QuoteHandler(MsgHandler):
             return protocol.encode({"user_balance": None, "msg_type": "UserBalance"})
         historical_books = product_manager.historical_order_books[product]
         user_balances = [
-            book.user_balance[message["user"]]
+            {**book.user_balance[message["user"]], 'timestamp': book.timestamp}
             for book in historical_books
             if message["user"] in book.user_balance
         ]
         # Add current balance
         user_balances.append(product_manager.get_order_book(product, False).user_balance[message["user"]])
+        # user_balances[-1]['timestamp'] = time.time_ns()
         protocol.set_target(message["user"])
         return protocol.encode({"user_balance": user_balances, "msg_type": "UserBalance"})
 
@@ -241,7 +245,6 @@ class QuoteHandler(MsgHandler):
         # Add current order book to the historical report
         report.append(product_manager.get_order_book(product, False).copy())
         return protocol.encode({"history": report, "msg_type": "CaptureReport"})
-
 
     msg_type_handlers = {
         "OrderStatusRequest": lambda message: QuoteHandler.order_stats(message),
@@ -271,6 +274,7 @@ class WebSocketHandler(tornado.websocket.WebSocketHandler):
         """
         self.clients.add(self)
         logging.info("New WebSocket connection")
+
     def on_close(self):
         """
         Handles WebSocket connection close - removes the client from the subscribed clients.

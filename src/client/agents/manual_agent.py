@@ -21,6 +21,7 @@ print()
 manual_agent.list_user_orders(product1)
 manual_agent2.list_user_orders(product1)
 manual_agent.user_balance(product1)
+manual_agent2.user_balance(product1)
 h = manual_agent.historical_order_books(product1, 10)
 
 # manual_agent.put_order({"side": "buy", "quantity": 100, "price": 20.0}, product1)

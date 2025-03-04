@@ -140,6 +140,13 @@ class Trader:
         :param product: Product name
         :return: Order ID if not fully filled, None otherwise
         """
+        # Check if the user has enough volume to place the order
+        if order["side"] == "sell":
+            user_balance = self.user_balance(product, verbose=False)[-1]["volume"]
+            if order["quantity"] > user_balance:
+                print("\033[91mError: Insufficient order volume.\033[0m")  # Print in red
+                # return None
+
         data = {"order": order, "product": product, "msg_type": "NewOrderSingle"}
         message = self.PROTOCOL.encode(data)
 
@@ -241,10 +248,12 @@ class Trader:
         print(pd.DataFrame(data).T)
         return data
 
-    def user_balance(self, product):
+    def user_balance(self, product, verbose=True):
         """
         Returns the user's balance for a specific product.
+        Last element in the list is current balance and volume - therefore no timestamp is needed.
         :param product: Product name
+        :param verbose: If True, print the user's balance
         :return: array with user's balance
         """
         data = {"product": product, "msg_type": "UserBalanceRequest"}
@@ -254,7 +263,8 @@ class Trader:
         response = response.json()
         response["msg_type"] = "UserBalance"
         data = self.PROTOCOL.decode(response)
-        print(f"User balance for {product}: {data['user_balance']}")
+        if verbose:
+            print(f"User balance for {product}: {data['user_balance']}")
         return data["user_balance"]
 
     def historical_order_books(self, product, history_length):
@@ -273,9 +283,10 @@ class Trader:
         data = self.PROTOCOL.decode(response)
         print(f"Historical order books for {product}:")
         for i, order_book in enumerate(data["history"]):
-            print(f"Order book {i}:")
+            order_book_dict = json.loads(order_book)  # Parse the order_book string to a dictionary
+            print(f"Order book {i}:, timestamp: {order_book_dict['Timestamp']}")
             print("=====================================")
-            self.display_order_book(json.loads(order_book), product=product)
+            self.display_order_book(order_book_dict, product=product)
             print()
         return data["history"]
 
