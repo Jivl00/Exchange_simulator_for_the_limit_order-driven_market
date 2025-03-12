@@ -63,8 +63,14 @@ class MsgHandler(tornado.web.RequestHandler):
             self.set_status(400)
             self.write({"error": f"Unknown message type: {msg_type}"})
             return
-
-        response = handler(message)
+        try:
+            response = handler(message)
+        except Exception as e:
+            logging.error(e)
+            self.set_status(500)
+            self.write({"error": "Internal server error"})
+            logging.error("Internal server error")
+            return
         logging.debug(f"S> {response}")
         self.write({"message": response.decode()})
 
@@ -92,6 +98,7 @@ class TradingHandler(MsgHandler):
             message["order"]["quantity"],
             message["order"]["price"]
         )
+        print(order.price)
         ID += 1  # Increment order ID
         status = product_manager.get_matching_engine(product, timestamp).match_order(order)  # Match order
         protocol.set_target(message["order"]["user"])  # Set target to user
@@ -296,6 +303,8 @@ class WebSocketHandler(tornado.websocket.WebSocketHandler):
         :param message: message to broadcast
         """
         message = {"message": message.decode()}
+        # sleep_time = 1
+        # time.sleep(sleep_time)
         for client in cls.clients:
             client.write_message(message)
 

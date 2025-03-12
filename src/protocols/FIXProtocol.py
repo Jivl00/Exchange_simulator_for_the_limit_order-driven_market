@@ -1,5 +1,4 @@
 import json
-
 import simplefix
 from src.protocols.IProtocol import IProtocol
 
@@ -526,7 +525,11 @@ class FIXProtocol(IProtocol):
         :return: Decoded message
         """
         msg_type = message['msg_type']
-        message = self.parse_message(message['message'])
+        try:
+            message = self.parse_message(message['message'])
+        except Exception as e:
+            print(f"Error parsing message: {e}")
+            return None
         msg_types_map = {
             # Client -> Server
             "OrderStatus": lambda msg: self.OrderStatus_decode(msg),

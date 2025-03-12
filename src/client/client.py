@@ -148,8 +148,9 @@ class Trader (Subscriber, ABC):
         response = response.json()
         response["msg_type"] = "ExecutionReport"
         response_data = self.PROTOCOL.decode(response)
-        if response_data["status"] is False:
+        if response_data is None or response_data.get("status") is False:
             print("\033[91mError: Order put failed.\033[0m")  # Print in red
+            return None
 
         return response_data["order_id"] if response_data["status"] else None
 
@@ -260,11 +261,12 @@ class Trader (Subscriber, ABC):
             print(f"User balance for {product}: {data['user_balance']}")
         return data["user_balance"]
 
-    def historical_order_books(self, product, history_length):
+    def historical_order_books(self, product, history_length, verbose=True):
         """
         Returns the historical order books for a specific product.
         :param product: Product name
         :param history_length: Number of historical order books to return + 1 (current order book)
+        :param verbose: If True, print the historical order books
         :return: historical order books
         """
         data = {"product": product, "history_len": history_length, "msg_type": "CaptureReportRequest"}
@@ -274,13 +276,14 @@ class Trader (Subscriber, ABC):
         response = response.json()
         response["msg_type"] = "CaptureReport"
         data = self.PROTOCOL.decode(response)
-        print(f"Historical order books for {product}:")
-        for i, order_book in enumerate(data["history"]):
-            order_book_dict = json.loads(order_book)  # Parse the order_book string to a dictionary
-            print(f"Order book {i}:, timestamp: {order_book_dict['Timestamp']}")
-            print("=====================================")
-            self.display_order_book(order_book_dict, product=product)
-            print()
+        if verbose:
+            print(f"Historical order books for {product}:")
+            for i, order_book in enumerate(data["history"]):
+                order_book_dict = json.loads(order_book)  # Parse the order_book string to a dictionary
+                print(f"Order book {i}:, timestamp: {order_book_dict['Timestamp']}")
+                print("=====================================")
+                self.display_order_book(order_book_dict, product=product)
+                print()
         return data["history"]
 
     @staticmethod

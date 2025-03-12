@@ -15,7 +15,7 @@ class AlgorithmicTrader (Trader):
         :param config:  Configuration dictionary
         """
         super().__init__(name, server, config)
-        self.current_mid_prices = {}
+        self.current_mid_price = {}
 
     def receive_market_data(self, message):
         """
@@ -24,12 +24,11 @@ class AlgorithmicTrader (Trader):
         """
         bids = message["order_book"]["Bids"]
         asks = message["order_book"]["Asks"]
-        print(f"Received order book: {message}")
         product = message["product"]
         if bids and asks:
-            self.current_mid_prices[product] = (bids[0]["price"] + asks[0]["price"]) / 2
+            self.current_mid_price[product] = (bids[0]["Price"] + asks[0]["Price"]) / 2
         else:
-            self.current_mid_prices[product] = None
+            self.current_mid_price[product] = None
         self.handle_market_data(message)
         self.trade()
 

@@ -169,7 +169,7 @@ class OrderBook:
         self.delete_order(order_id)
         # Modify the order
         if new_price is not None:
-            order.price = new_price
+            order.price = round(new_price, 2)
         if new_quantity is not None:
             order.quantity = new_quantity
         # Re-add the order

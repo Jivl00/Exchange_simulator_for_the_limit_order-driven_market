@@ -18,7 +18,7 @@ class Order:
         self.user = userID
         self.side = side
         self.quantity = quantity
-        self.price = price
+        self.price = round(price, 2)
 
     def __eq__(self, other):
         return self.id == other.id
