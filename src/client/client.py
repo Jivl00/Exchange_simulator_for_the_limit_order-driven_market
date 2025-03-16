@@ -1,5 +1,6 @@
 import json
 import asyncio
+import inspect
 import requests
 import pandas as pd
 from abc import ABC, abstractmethod
@@ -109,6 +110,40 @@ class Trader (Subscriber, ABC):
         self.TRADING_SESSION = config["TRADING_SESSION"]
         self.QUOTE_SESSION = config["QUOTE_SESSION"]
 
+    @staticmethod
+    def parse_response(response):
+        """
+        Parse the response from the server.
+        :param response: Response from the server
+        :return: JSON with response data if successful, None otherwise
+        """
+        caller = inspect.stack()[1].function
+        response = response.json()
+        if "error" in response:
+            print(f"\033[91mError in {caller}: {response['error']}\033[0m")  # Print in red
+            return None
+        return response
+
+    def register(self, budget):
+        """
+        Register a new user with the server.
+        :param budget: Initial budget
+        :return: Unique user ID if successful, None otherwise
+        """
+        data = {"budget": budget, "msg_type": "RegisterRequest"}
+        message = self.PROTOCOL.encode(data)
+        response = requests.post(f"{self.BASE_URL}/{self.TRADING_SESSION}",
+                                 json={"message": message, "msg_type": data["msg_type"]})
+        response = self.parse_response(response)
+        if response is None:
+            return None
+        response["msg_type"] = "RegisterResponse"
+        response_data = self.PROTOCOL.decode(response)
+        print(f"User registered with ID: {response_data['user']}")
+        # Change the user ID to the unique user ID returned by the server
+        self.PROTOCOL.set_sender(response_data["user"])
+        return response_data["user"]
+
     def order_stats(self, ID, product):
         """
         Request order status from the server.
@@ -121,7 +156,9 @@ class Trader (Subscriber, ABC):
 
         response = requests.get(f"{self.BASE_URL}/{self.QUOTE_SESSION}",
                                 json={"message": message, "msg_type": data["msg_type"]})
-        response = response.json()
+        response = self.parse_response(response)
+        if response is None:
+            return None
         response["msg_type"] = "OrderStatus"
         order = self.PROTOCOL.decode(response)
         return order
@@ -135,7 +172,7 @@ class Trader (Subscriber, ABC):
         """
         # Check if the user has enough volume to place the order
         if order["side"] == "sell":
-            user_balance = self.user_balance(product, verbose=False)[-1]["volume"]
+            user_balance = self.user_balance(product, verbose=False)["history_balance"][-1]["volume"]
             if order["quantity"] > user_balance:
                 print("\033[91mError: Insufficient order volume.\033[0m")  # Print in red
                 # return None
@@ -145,11 +182,13 @@ class Trader (Subscriber, ABC):
 
         response = requests.post(f"{self.BASE_URL}/{self.TRADING_SESSION}",
                                  json={"message": message, "msg_type": data["msg_type"]})
-        response = response.json()
+        response = self.parse_response(response)
+        if response is None:
+            return None
         response["msg_type"] = "ExecutionReport"
         response_data = self.PROTOCOL.decode(response)
         if response_data is None or response_data.get("status") is False:
-            print("\033[91mError: Order put failed.\033[0m")  # Print in red
+            print("\033[91mError: Order put failed. Please check the order details and remaining balance.\033[0m")
             return None
 
         return response_data["order_id"] if response_data["status"] else None
@@ -166,7 +205,9 @@ class Trader (Subscriber, ABC):
 
         response = requests.post(f"{self.BASE_URL}/{self.TRADING_SESSION}",
                                  json={"message": message, "msg_type": data["msg_type"]})
-        response = response.json()
+        response = self.parse_response(response)
+        if response is None:
+            return None
         response["msg_type"] = "ExecutionReportCancel"
         response_data = self.PROTOCOL.decode(response)
         return response_data["status"]
@@ -183,7 +224,9 @@ class Trader (Subscriber, ABC):
         message = self.PROTOCOL.encode(data)
         response = requests.post(f"{self.BASE_URL}/{self.TRADING_SESSION}",
                                  json={"message": message, "msg_type": data["msg_type"]})
-        response = response.json()
+        response = self.parse_response(response)
+        if response is None:
+            return None
         response["msg_type"] = "ExecutionReportModify"
         response_data = self.PROTOCOL.decode(response)
         return response_data["status"]
@@ -219,7 +262,10 @@ class Trader (Subscriber, ABC):
         message = self.PROTOCOL.encode(data)
         response = requests.get(f"{self.BASE_URL}/{self.QUOTE_SESSION}",
                                 json={"message": message, "msg_type": data["msg_type"]})
-        order_book_data = response.json()
+        response = self.parse_response(response)
+        if response is None:
+            return None
+        order_book_data = response
         order_book_data["msg_type"] = "MarketDataSnapshot"
         order_book_data = self.PROTOCOL.decode(order_book_data)["order_book"]
 
@@ -235,7 +281,10 @@ class Trader (Subscriber, ABC):
         message = self.PROTOCOL.encode(data)
         response = requests.get(f"{self.BASE_URL}/{self.QUOTE_SESSION}",
                                 json={"message": message, "msg_type": data["msg_type"]})
-        response = response.json()
+        response = self.parse_response(response)
+        if response is None:
+            return None
+        print("response", response)
         response["msg_type"] = "UserOrderStatus"
         data = self.PROTOCOL.decode(response)
         data = data["user_orders"]
@@ -248,13 +297,15 @@ class Trader (Subscriber, ABC):
         Last element in the list is current balance and volume - therefore no timestamp is needed.
         :param product: Product name
         :param verbose: If True, print the user's balance
-        :return: array with user's balance
+        :return: array with user's balance if successful, None otherwise
         """
         data = {"product": product, "msg_type": "UserBalanceRequest"}
         message = self.PROTOCOL.encode(data)
         response = requests.get(f"{self.BASE_URL}/{self.QUOTE_SESSION}",
                                 json={"message": message, "msg_type": data["msg_type"]})
-        response = response.json()
+        response = self.parse_response(response)
+        if response is None:
+            return None
         response["msg_type"] = "UserBalance"
         data = self.PROTOCOL.decode(response)
         if verbose:
@@ -273,7 +324,9 @@ class Trader (Subscriber, ABC):
         message = self.PROTOCOL.encode(data)
         response = requests.get(f"{self.BASE_URL}/{self.QUOTE_SESSION}",
                                 json={"message": message, "msg_type": data["msg_type"]})
-        response = response.json()
+        response = self.parse_response(response)
+        if response is None:
+            return None
         response["msg_type"] = "CaptureReport"
         data = self.PROTOCOL.decode(response)
         if verbose:

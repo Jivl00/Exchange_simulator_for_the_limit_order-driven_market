@@ -15,13 +15,13 @@ class SwingTrader(AlgorithmicTrader):
 
     def trade(self):
         pass
-        # for product in self.products:
-        #     if product not in self.current_mid_price:
-        #         continue
-        #     if self.current_mid_price[product] and self.current_mid_price[product] < self.support_level: # Buy
-        #         self.put_order({"side": "buy", "quantity": 100, "price": self.current_mid_price[product]}, product)
-        #     elif self.current_mid_price[product] and self.current_mid_price[product] >= self.resistance_level: # Sell
-        #         self.put_order({"side": "sell", "quantity": 100, "price": self.current_mid_price[product]}, product)
+        for product in self.products:
+            if product not in self.current_mid_price:
+                continue
+            if self.current_mid_price[product] and self.current_mid_price[product] < self.support_level: # Buy
+                self.put_order({"side": "buy", "quantity": 100, "price": self.current_mid_price[product]}, product)
+            elif self.current_mid_price[product] and self.current_mid_price[product] >= self.resistance_level: # Sell
+                self.put_order({"side": "sell", "quantity": 100, "price": self.current_mid_price[product]}, product)
 
 config = json.load(open("config/server_config.json"))
 momentum_trader = SwingTrader("swing_trader", "server", config)

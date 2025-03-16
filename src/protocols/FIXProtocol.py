@@ -25,6 +25,14 @@ class FIXProtocol(IProtocol):
         """
         self.TARGET = "56=" + target
 
+    def set_sender(self, sender):
+        """
+        Set the sender ID.
+        :param sender: Sender ID
+        :return: None
+        """
+        self.SENDER = "49=" + sender
+
     def fix_message_init(self):
         """
         Initialize a FIX message with standard header tags.
@@ -37,6 +45,18 @@ class FIXProtocol(IProtocol):
         message.append_utc_timestamp(52, precision=6, header=True)
         message.append_pair(34, self.MSG_SEQ_NUM, header=True)
         self.MSG_SEQ_NUM += 1
+        return message
+
+    def RegisterRequest_encode(self, data):
+        """
+        Encode the RegisterRequest message.
+        :param data: Dictionary with budget
+        :return: simplefix.FixMessage object
+        """
+        budget = data["budget"]
+        message = self.fix_message_init()
+        message.append_pair(35, "A", header=True)  # MsgType = Logon
+        message.append_pair(58, budget)  # Text = Budget; modification of FIX protocol
         return message
 
     def OrderStatusRequest_encode(self, data):
@@ -152,6 +172,18 @@ class FIXProtocol(IProtocol):
         message.append_pair(55, product) # Symbol (used as product name)
         message.append_pair(568, data["history_len"])  # TradeRequestID = History length (number of trades)
         message.append_pair(569, 0)  # TradeRequestType = All trades
+        return message
+
+    def RegisterResponse_encode(self, data):
+        """
+        Encode the RegisterResponse message.
+        :param data: Dictionary with user ID and status
+        :return: simplefix.FixMessage object
+        """
+        user = data["user"]
+        message = self.fix_message_init()
+        message.append_pair(35, "A", header=True)  # MsgType = Logon
+        message.append_pair(553, user)  # New unique user ID
         return message
 
     def OrderStatus_encode(self, data):
@@ -298,6 +330,7 @@ class FIXProtocol(IProtocol):
         """
         msg_types_map = {
             # Client -> Server
+            "RegisterRequest": lambda data: self.RegisterRequest_encode(data),
             "OrderStatusRequest": lambda data: self.OrderStatusRequest_encode(data),
             "NewOrderSingle": lambda data: self.NewOrderSingle_encode(data),
             "OrderCancelRequest": lambda data: self.OrderCancelRequest_encode(data),
@@ -308,6 +341,7 @@ class FIXProtocol(IProtocol):
             "CaptureReportRequest": lambda data: self.CaptureReportRequest_encode(data),
 
             # Server -> Client
+            "RegisterResponse": lambda data: self.RegisterResponse_encode(data),
             "OrderStatus": lambda data: self.OrderStatus_encode(data),
             "ExecutionReport": lambda data: self.ExecutionReport_encode(data),
             "ExecutionReportCancel": lambda data: self.ExecutionReportCancel_encode(data),
@@ -334,6 +368,17 @@ class FIXProtocol(IProtocol):
         self.parser.append_buffer(msg)
         message = self.parser.get_message()
         return message
+
+    @staticmethod
+    def RegisterRequest_decode(data):
+        """
+        Decode the RegisterRequest message.
+        :param data: FIX message
+        :return: Dictionary with user ID and budget
+        """
+        user = data.get(49).decode()
+        budget = float(data.get(58).decode())
+        return {"user": user, "budget": budget}
 
     @staticmethod
     def OrderStatus_decode(data):
@@ -394,6 +439,16 @@ class FIXProtocol(IProtocol):
         return {"order_book": order_book, "product": product}
 
     @staticmethod
+    def RegisterResponse_decode(data):
+        """
+        Decode the RegisterResponse message.
+        :param data: FIX message
+        :return: Dictionary with user ID
+        """
+        user = data.get(553).decode()
+        return {"user": user}
+
+    @staticmethod
     def OrderStatusRequest_decode(data):
         """
         Decode the OrderStatusRequest message.
@@ -403,7 +458,7 @@ class FIXProtocol(IProtocol):
         order_id = data.get(41).decode()
         sender = data.get(49).decode()
         product = data.get(55).decode() # Symbol (used as product name)
-        return {"id": order_id, "sender": sender, "product": product}
+        return {"id": order_id, "user": sender, "product": product}
 
     @staticmethod
     def UserOrders_decode(data):
@@ -413,7 +468,7 @@ class FIXProtocol(IProtocol):
         :return: Dictionary with user orders
         """
         user_orders = json.loads(data.get(58).decode())
-        return {"user_orders": user_orders}
+        return {"user_orders": user_orders, "user": data.get(49).decode()}
 
     @staticmethod
     def UserBalance_decode(data):
@@ -423,7 +478,7 @@ class FIXProtocol(IProtocol):
         :return: Dictionary with user balance
         """
         balance = json.loads(data.get(58).decode())
-        return {"user_balance": balance}
+        return {"user_balance": balance, "user": data.get(49).decode()}
 
     @staticmethod
     def CaptureReport_decode(data):
@@ -433,7 +488,7 @@ class FIXProtocol(IProtocol):
         :return: Dictionary with trade history
         """
         history = json.loads(data.get(58).decode())
-        return {"history": history}
+        return {"history": history, "user": data.get(49).decode()}
 
     @staticmethod
     def NewOrderSingle_decode(data):
@@ -449,7 +504,7 @@ class FIXProtocol(IProtocol):
             "quantity": int(data.get(38).decode()),
             "price": float(data.get(44).decode())
         }
-        return {"order": order, "product": data.get(55).decode()}
+        return {"order": order, "product": data.get(55).decode(), "user": data.get(49).decode()}
 
     @staticmethod
     def OrderCancelRequest_decode(data):
@@ -460,7 +515,7 @@ class FIXProtocol(IProtocol):
         """
         order_id = data.get(41).decode()
         product = data.get(55).decode() # Symbol (used as product name)
-        return {"order_id": order_id, "product": product}
+        return {"order_id": order_id, "product": product, "user": data.get(49).decode()}
 
     @staticmethod
     def OrderModifyRequestQty_decode(data):
@@ -472,7 +527,7 @@ class FIXProtocol(IProtocol):
         order_id = data.get(41).decode()
         quantity = int(data.get(38).decode())
         product = data.get(55).decode() # Symbol (used as product name)
-        return {"order_id": order_id, "quantity": quantity, "product": product}
+        return {"order_id": order_id, "quantity": quantity, "product": product, "user": data.get(49).decode()}
 
     @staticmethod
     def MarketDataRequest_decode(data):
@@ -483,7 +538,7 @@ class FIXProtocol(IProtocol):
         """
         depth = int(data.get(264).decode())
         product = data.get(55).decode() # Symbol (used as product name)
-        return {"depth": depth, "product": product}
+        return {"depth": depth, "product": product, "user": data.get(49).decode()}
 
     @staticmethod
     def UserOrderStatusRequest_decode(data):
@@ -516,7 +571,7 @@ class FIXProtocol(IProtocol):
         """
         product = data.get(55).decode()  # Symbol (used as product name)
         history_len = int(data.get(568).decode())
-        return {"product": product, "history_len": history_len}
+        return {"product": product, "history_len": history_len, "user": data.get(49).decode()}
 
     def decode(self, message):
         """
@@ -532,6 +587,7 @@ class FIXProtocol(IProtocol):
             return None
         msg_types_map = {
             # Client -> Server
+            "RegisterRequest": lambda msg: self.RegisterRequest_decode(msg),
             "OrderStatus": lambda msg: self.OrderStatus_decode(msg),
             "ExecutionReport": lambda msg: self.ExecutionReport_decode(msg),
             "ExecutionReportCancel": lambda msg: self.ExecutionReportCancel_decode(msg),
@@ -542,6 +598,7 @@ class FIXProtocol(IProtocol):
             "CaptureReport": lambda msg: self.CaptureReport_decode(msg),
 
             # Server -> Client
+            "RegisterResponse": lambda msg: self.RegisterResponse_decode(msg),
             "OrderStatusRequest": lambda msg: self.OrderStatusRequest_decode(msg),
             "NewOrderSingle": lambda msg: self.NewOrderSingle_decode(msg),
             "OrderCancelRequest": lambda msg: self.OrderCancelRequest_decode(msg),

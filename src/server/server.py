@@ -4,8 +4,10 @@ import tornado.websocket
 import json
 import logging
 import time
+import uuid
 
 from order_book.product_manager import TradingProductManager
+from user_manager import UserManager
 from src.order_book.order import Order
 from src.protocols.FIXProtocol import FIXProtocol
 
@@ -18,8 +20,12 @@ ID = 0
 
 # Initialize order books and matching engines for multiple products
 products = ["product1", "product2", "product3"]  # Add more products as needed
+fixed_fee=0.01
+percentage_fee=0.001
+per_share_fee=0.005
 
 product_manager = TradingProductManager(products)
+user_manager = UserManager()
 protocol = FIXProtocol("server")
 
 
@@ -64,18 +70,51 @@ class MsgHandler(tornado.web.RequestHandler):
             self.write({"error": f"Unknown message type: {msg_type}"})
             return
         try:
+            message = protocol.decode(message)
+            user_ID = message["user"]
+            if not user_manager.user_exists(user_ID) and msg_type != "RegisterRequest":
+                self.set_status(400)
+                self.write({"error": "Invalid user ID, please register first"})
+                return
             response = handler(message)
         except Exception as e:
             logging.error(e)
             self.set_status(500)
             self.write({"error": "Internal server error"})
-            logging.error("Internal server error")
+            logging.error(f"Error in handling message: {e}")
             return
         logging.debug(f"S> {response}")
         self.write({"message": response.decode()})
 
+    @staticmethod
+    def update_user_post_buy_budget(user_ID):
+        """
+        Update the user's post-buy budget.
+        :param user_ID: User ID
+        """
+        initial_budget = user_manager.users[user_ID].budget
+        balance = sum(product_manager.get_order_book(product, False)
+                      .user_balance[user_ID]["balance"] for product in products)
+
+        # Get all buy orders of the user and update the post-buy budget
+        buy_orders_value = sum(order.price * order.quantity for product in products
+                               if (order_book := product_manager.get_order_book(product, False))
+                               for order in order_book.get_orders_by_user(user_ID) if order.side == "buy")
+        user_manager.users[user_ID].post_buy_budget = initial_budget - buy_orders_value + balance
+
 
 class TradingHandler(MsgHandler):
+    @staticmethod
+    def register(message):
+        """
+        Registers a new user.
+        :param message: client message with user budget
+        :return: unique user ID
+        """
+        user_ID = str(uuid.uuid4())
+        user_manager.add_user(message["user"], user_ID, message["budget"])
+        return protocol.encode({"user": user_ID, "msg_type": "RegisterResponse"})  # Return user ID
+
     @staticmethod
     def match_order(message):
         """
@@ -85,10 +124,14 @@ class TradingHandler(MsgHandler):
         :return: server response
         """
         global ID
-        message = protocol.decode(message)
         product = message["product"]
         if not product_exists(product):
             return protocol.encode({"order_id": -1, "status": False, "msg_type": "ExecutionReport"})
+        # If the order is a buy order, check if the user has enough budget to place the order
+        if message["order"]["side"] == "buy":
+            TradingHandler.update_user_post_buy_budget(message["order"]["user"])
+            if user_manager.users[message["order"]["user"]].post_buy_budget < message["order"]["quantity"] * message["order"]["price"]:
+                return protocol.encode({"order_id": -1, "status": False, "msg_type": "ExecutionReport"})
         timestamp = time.time_ns()
         order = Order(
             str(ID),  # Order ID
@@ -98,11 +141,15 @@ class TradingHandler(MsgHandler):
             message["order"]["quantity"],
             message["order"]["price"]
         )
-        print(order.price)
         ID += 1  # Increment order ID
         status = product_manager.get_matching_engine(product, timestamp).match_order(order)  # Match order
         protocol.set_target(message["order"]["user"])  # Set target to user
         response = protocol.encode({"order_id": order.id, "status": status, "msg_type": "ExecutionReport"})
+        if status is not False: # If the order was added to the order book or fully matched -> apply trading fee
+            percentage_based_fee = order.price * percentage_fee
+            per_share_based_fee = order.quantity * per_share_fee
+            total_fee = fixed_fee + percentage_based_fee + per_share_based_fee
+            user_manager.users[message["order"]["user"]].budget -= total_fee
 
         # Broadcast the order book to all clients
         broadcast_response = protocol.encode(
@@ -118,7 +165,6 @@ class TradingHandler(MsgHandler):
         :param message: client message with order ID
         :return: server response
         """
-        message = protocol.decode(message)
         product = message["product"]
         if not product_exists(product):
             return protocol.encode({"order_id": -1, "status": False, "msg_type": "ExecutionReportCancel"})
@@ -137,7 +183,6 @@ class TradingHandler(MsgHandler):
         :param message: client message with order ID and new quantity
         :return: server response
         """
-        message = protocol.decode(message)
         product = message["product"]
         if not product_exists(product):
             return protocol.encode({"order_id": -1, "status": False, "msg_type": "ExecutionReportModify"})
@@ -151,6 +196,7 @@ class TradingHandler(MsgHandler):
         return protocol.encode({"order_id": order_id, "status": ret, "msg_type": "ExecutionReportModify"})
 
     msg_type_handlers = {
+        "RegisterRequest": lambda message: TradingHandler.register(message),
         "NewOrderSingle": lambda message: TradingHandler.match_order(message),
         "OrderCancelRequest": lambda message: TradingHandler.delete_order(message),
         "OrderModifyRequestQty": lambda message: TradingHandler.modify_order_qty(message)
@@ -172,14 +218,13 @@ class QuoteHandler(MsgHandler):
         :param message: client message with order ID
         :return: server response
         """
-        message = protocol.decode(message)
         product = message["product"]
         if not product_exists(product):
             return protocol.encode({"order": None, "msg_type": "OrderStatus"})
         order_book = product_manager.get_order_book(product, False)
         order_id = message["id"]
         order = order_book.get_order_by_id(order_id)
-        protocol.set_target(message["sender"])
+        protocol.set_target(message["user"])
         return protocol.encode({"order": order, "msg_type": "OrderStatus"})
 
     @staticmethod
@@ -189,13 +234,12 @@ class QuoteHandler(MsgHandler):
         :param message: client message with product name
         :return: server response
         """
-        message = protocol.decode(message)
         product = message["product"]
         if not product_exists(product):
-            return protocol.encode({"order_book": None, "product":product, "msg_type": "MarketDataSnapshot"})
+            return protocol.encode({"order_book": None, "product": product, "msg_type": "MarketDataSnapshot"})
         order_book = product_manager.get_order_book(product, False)
         order_book_data = order_book.jsonify_order_book()
-        return protocol.encode({"order_book": order_book_data, "product":product, "msg_type": "MarketDataSnapshot"})
+        return protocol.encode({"order_book": order_book_data, "product": product, "msg_type": "MarketDataSnapshot"})
 
     @staticmethod
     def user_data(message):
@@ -204,7 +248,6 @@ class QuoteHandler(MsgHandler):
         :param message: client message with user ID
         :return: server response
         """
-        message = protocol.decode(message)
         product = message["product"]
         if not product_exists(product):
             return protocol.encode({"user_orders": None, "msg_type": "UserOrderStatus"})
@@ -214,14 +257,14 @@ class QuoteHandler(MsgHandler):
         protocol.set_target(message["user"])
         return protocol.encode({"user_orders": user_orders, "msg_type": "UserOrderStatus"})
 
-    @staticmethod
-    def user_balance(message):
+    @classmethod
+    def user_balance(cls, message):
         """
         Returns records of the balance of a user.
         :param message: client message with user ID
         :return: server response
         """
-        message = protocol.decode(message)
+        cls.update_user_post_buy_budget(message["user"])
         product = message["product"]
         if not product_exists(product):
             return protocol.encode({"user_balance": None, "msg_type": "UserBalance"})
@@ -235,6 +278,9 @@ class QuoteHandler(MsgHandler):
         user_balances.append(product_manager.get_order_book(product, False).user_balance[message["user"]])
         # user_balances[-1]['timestamp'] = time.time_ns()
         protocol.set_target(message["user"])
+        user_balances = {"history_balance": user_balances, "current_balance": user_balances[-1],
+                         "budget": user_manager.users[message["user"]].budget,
+                         "post_buy_budget": user_manager.users[message["user"]].post_buy_budget}
         return protocol.encode({"user_balance": user_balances, "msg_type": "UserBalance"})
 
     @staticmethod
@@ -244,7 +290,6 @@ class QuoteHandler(MsgHandler):
         :param message: client message with product name
         :return: server response
         """
-        message = protocol.decode(message)
         product = message["product"]
         if not product_exists(product):
             return protocol.encode({"report": None, "msg_type": "CaptureReport"})
@@ -303,8 +348,6 @@ class WebSocketHandler(tornado.websocket.WebSocketHandler):
         :param message: message to broadcast
         """
         message = {"message": message.decode()}
-        # sleep_time = 1
-        # time.sleep(sleep_time)
         for client in cls.clients:
             client.write_message(message)
 
