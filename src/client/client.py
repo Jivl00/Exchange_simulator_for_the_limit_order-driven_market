@@ -1,6 +1,8 @@
 import json
 import asyncio
 import inspect
+import sys
+
 import requests
 import pandas as pd
 from abc import ABC, abstractmethod
@@ -172,10 +174,14 @@ class Trader (Subscriber, ABC):
         """
         # Check if the user has enough volume to place the order
         if order["side"] == "sell":
-            user_balance = self.user_balance(product, verbose=False)["history_balance"][-1]["volume"]
+            user_balance = self.user_balance(product, verbose=False)
+            if user_balance is None:
+                print("\033[91mError: User balance not found.\033[0m")  # Print in red
+                return None
+            user_balance = user_balance["history_balance"][-1]["volume"]
             if order["quantity"] > user_balance:
                 print("\033[91mError: Insufficient order volume.\033[0m")  # Print in red
-                # return None
+                return None
 
         data = {"order": order, "product": product, "msg_type": "NewOrderSingle"}
         message = self.PROTOCOL.encode(data)
@@ -255,7 +261,7 @@ class Trader (Subscriber, ABC):
         """
         Returns the order book for a specific product from the server.
         :param product: Product name
-        :param depth: Market depth (0 = full book)
+        :param depth: Market depth (0 = full book) #TODO: Parameter not used
         :return: JSON with order book data
         """
         data = {"depth": depth, "product": product, "msg_type": "MarketDataRequest"}
@@ -284,11 +290,9 @@ class Trader (Subscriber, ABC):
         response = self.parse_response(response)
         if response is None:
             return None
-        print("response", response)
         response["msg_type"] = "UserOrderStatus"
         data = self.PROTOCOL.decode(response)
         data = data["user_orders"]
-        print(pd.DataFrame(data).T)
         return data
 
     def user_balance(self, product, verbose=True):
@@ -326,7 +330,7 @@ class Trader (Subscriber, ABC):
                                 json={"message": message, "msg_type": data["msg_type"]})
         response = self.parse_response(response)
         if response is None:
-            return None
+            return []
         response["msg_type"] = "CaptureReport"
         data = self.PROTOCOL.decode(response)
         if verbose:
@@ -380,3 +384,75 @@ class Trader (Subscriber, ABC):
 
         # Print the concatenated DataFrame
         print(order_book_df.fillna('').to_string(index=False))
+
+    def compute_quantity(self, product, side, price, ratio=0.1):
+        """
+        Compute the quantity based on the budget and price.
+        :param product: Product name
+        :param side: Side (buy or sell)
+        :param price: Price
+        :param ratio: Ratio of the budget to use
+        :return: Quantity
+        """
+        user_balance = self.user_balance(product, verbose=False)
+        order_book_data = self.order_book_request(product)
+        if user_balance is None:
+            print("\033[91mError: User balance not found.\033[0m")
+            return 0
+        if order_book_data is None:
+            print("\033[91mError: Order book not found.\033[0m")
+            return 0
+
+        owned_volume = sys.maxsize
+        post_buy_budget = sys.maxsize
+        if side == "sell": # If selling, use the current owned volume
+            owned_volume = user_balance["current_balance"]["volume"]
+            available_volume = pd.DataFrame(order_book_data['Bids'])
+        else: # If buying, use the post-buy budget
+            post_buy_budget = user_balance["post_buy_budget"] * ratio
+            available_volume = pd.DataFrame(order_book_data['Asks'])
+
+        if not available_volume.empty: # Aggregated order book
+            available_volume = available_volume.groupby('Price', as_index=False).agg(
+                {'Quantity': 'sum', 'ID': 'count', 'User': 'first'})
+            if len(available_volume) >= 3:
+                available_volume = sum(available_volume['Quantity'][:3])  # Top 3 levels
+            else:
+                available_volume = available_volume['Quantity'][0]  # Top of the book
+        else:
+            available_volume = 0
+
+        quantity = min(available_volume, int(post_buy_budget / price), owned_volume)
+        return quantity
+
+class AdminTrader(Trader, ABC):
+    """
+    Admin client class for communicating with the trading server.
+    """
+    def __init__(self, sender, target, config):
+        """
+        Initialize the admin client.
+        :param sender:  Name of the agent
+        :param target:  Server name
+        :param config:  Configuration dictionary
+        """
+        super().__init__(sender, target, config)
+
+    def initialize_liquidity_engine(self, budget, volume):
+        """
+        Initialize the liquidity engine.
+        :param budget: Initial budget
+        :param volume: Initial volume - int or dictionary with product specific values
+        """
+        data = {"budget": budget, "volume": volume, "msg_type": "InitializeLiquidityEngine"}
+        message = self.PROTOCOL.encode(data)
+        response = requests.post(f"{self.BASE_URL}/{self.TRADING_SESSION}",
+                                 json={"message": message, "msg_type": data["msg_type"]})
+        response = self.parse_response(response)
+        if response is None:
+            return None
+        response["msg_type"] = "UserBalance"
+        data = self.PROTOCOL.decode(response)
+        print(f"User balance for market maker: {data['user_balance']}")
+        return data["user_balance"]
+

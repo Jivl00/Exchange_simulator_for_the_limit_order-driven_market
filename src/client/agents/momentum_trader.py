@@ -17,18 +17,26 @@ class MomentumTrader(AlgorithmicTrader):
         if len(self.momentum[product]) > self.lookback:
             self.momentum[product] = self.momentum[product][1:]
         print("Momentum", product, self.momentum[product])
+        print(self.user_balance(product)["current_balance"])
 
     def trade(self):
         for product in self.momentum:
             if len(self.momentum[product]) < self.lookback:
                 continue
+            if self.current_mid_price[product] is None:
+                continue
             price_change = self.momentum[product][-1] - self.momentum[product][0]
             if price_change > 0: # Buy
-                self.put_order({"side": "buy", "quantity": 100, "price": self.current_mid_price[product]}, product)
+                quantity = self.compute_quantity(product, "buy", self.current_mid_price[product])
+                if quantity > 0:
+                    self.put_order({"side": "buy", "quantity": quantity, "price": self.current_mid_price[product]}, product)
             elif price_change < 0: # Sell
-                self.put_order({"side": "sell", "quantity": 100, "price": self.current_mid_price[product]}, product)
+                quantity = self.compute_quantity(product, "sell", self.current_mid_price[product])
+                if quantity > 0:
+                    self.put_order({"side": "sell", "quantity": quantity, "price": self.current_mid_price[product]}, product)
 
 config = json.load(open("config/server_config.json"))
 momentum_trader = MomentumTrader("momentum_trader", "server", config)
+momentum_trader.register(1000)
 momentum_trader.start_subscribe()
 

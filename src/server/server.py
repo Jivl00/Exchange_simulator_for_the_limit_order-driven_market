@@ -7,7 +7,7 @@ import time
 import uuid
 
 from order_book.product_manager import TradingProductManager
-from user_manager import UserManager
+from src.server.user_manager import UserManager
 from src.order_book.order import Order
 from src.protocols.FIXProtocol import FIXProtocol
 
@@ -19,7 +19,10 @@ MSG_SEQ_NUM = 0
 ID = 0
 
 # Initialize order books and matching engines for multiple products
-products = ["product1", "product2", "product3"]  # Add more products as needed
+products = ["product1", "product2"]  # Add more products as needed
+products = ["product1"]  # Add more products as needed
+
+# Trading fees, values taken from https://www.investopedia.com/terms/b/brokerage-fee.asp
 fixed_fee=0.01
 percentage_fee=0.001
 per_share_fee=0.005
@@ -85,7 +88,6 @@ class MsgHandler(tornado.web.RequestHandler):
             return
         logging.debug(f"S> {response}")
         self.write({"message": response.decode()})
-
     @staticmethod
     def update_user_post_buy_budget(user_ID):
         """
@@ -114,6 +116,23 @@ class TradingHandler(MsgHandler):
         user_ID = str(uuid.uuid4())
         user_manager.add_user(message["user"], user_ID, message["budget"])
         return protocol.encode({"user": user_ID, "msg_type": "RegisterResponse"})  # Return user ID
+
+    @staticmethod
+    def initialize_liq_engine(message):
+        """
+        Initializes the liquidity engine.
+        :param message: client message with user budget
+        :return: unique user ID
+        """
+        user = message["user"]
+        budget = message["budget"]
+        volume = message["volume"]
+        for product in products:
+            order_book = product_manager.get_order_book(product, False)
+            order_book.modify_user_balance(user, 0, volume[product] if isinstance(volume, dict) else volume)
+            user_manager.set_user_budget(user, budget)
+        user_balance = {product: product_manager.get_order_book(product, False).user_balance[user] for product in products}
+        return protocol.encode({"user_balance": user_balance, "msg_type": "UserBalance"})
 
     @staticmethod
     def match_order(message):
@@ -197,6 +216,7 @@ class TradingHandler(MsgHandler):
 
     msg_type_handlers = {
         "RegisterRequest": lambda message: TradingHandler.register(message),
+        "InitializeLiquidityEngine": lambda message: TradingHandler.initialize_liq_engine(message),
         "NewOrderSingle": lambda message: TradingHandler.match_order(message),
         "OrderCancelRequest": lambda message: TradingHandler.delete_order(message),
         "OrderModifyRequestQty": lambda message: TradingHandler.modify_order_qty(message)

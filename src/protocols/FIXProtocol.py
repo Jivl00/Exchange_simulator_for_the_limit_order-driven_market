@@ -59,6 +59,23 @@ class FIXProtocol(IProtocol):
         message.append_pair(58, budget)  # Text = Budget; modification of FIX protocol
         return message
 
+    def InitializeLiquidityEngine_encode(self, data):
+        """
+        Encode the InitializeLiquidityEngine message.
+        :param data: Dictionary with budget and volume
+        :return: simplefix.FixMessage object
+        """
+        budget = data["budget"]
+        volume = data["volume"]
+        message = self.fix_message_init()
+        message.append_pair(35, "A", header=True)  # MsgType = Logon
+        message.append_pair(44, budget)  # Price; modification of FIX protocol
+        if isinstance(volume, int):
+            message.append_pair(38, volume) # Quantity; modification of FIX protocol
+        else:
+            message.append_pair(38, json.dumps(volume))  # Quantity; modification of FIX protocol
+        return message
+
     def OrderStatusRequest_encode(self, data):
         """
         Encode the OrderStatusRequest message.
@@ -331,6 +348,7 @@ class FIXProtocol(IProtocol):
         msg_types_map = {
             # Client -> Server
             "RegisterRequest": lambda data: self.RegisterRequest_encode(data),
+            "InitializeLiquidityEngine": lambda data: self.InitializeLiquidityEngine_encode(data),
             "OrderStatusRequest": lambda data: self.OrderStatusRequest_encode(data),
             "NewOrderSingle": lambda data: self.NewOrderSingle_encode(data),
             "OrderCancelRequest": lambda data: self.OrderCancelRequest_encode(data),
@@ -379,6 +397,22 @@ class FIXProtocol(IProtocol):
         user = data.get(49).decode()
         budget = float(data.get(58).decode())
         return {"user": user, "budget": budget}
+
+    @staticmethod
+    def InitializeLiquidityEngine_decode(data):
+        """
+        Decode the InitializeLiquidityEngine message.
+        :param data: FIX message
+        :return: Dictionary with budget and volume
+        """
+        user = data.get(49).decode()
+        budget = float(data.get(44).decode())
+        volume = data.get(38).decode()
+        if volume.isdigit(): # Check if volume is a number
+            volume = int(volume)
+        else:
+            volume = json.loads(volume)
+        return {"user": user, "budget": budget, "volume": volume}
 
     @staticmethod
     def OrderStatus_decode(data):
@@ -588,6 +622,7 @@ class FIXProtocol(IProtocol):
         msg_types_map = {
             # Client -> Server
             "RegisterRequest": lambda msg: self.RegisterRequest_decode(msg),
+            "InitializeLiquidityEngine": lambda msg: self.InitializeLiquidityEngine_decode(msg),
             "OrderStatus": lambda msg: self.OrderStatus_decode(msg),
             "ExecutionReport": lambda msg: self.ExecutionReport_decode(msg),
             "ExecutionReportCancel": lambda msg: self.ExecutionReportCancel_decode(msg),

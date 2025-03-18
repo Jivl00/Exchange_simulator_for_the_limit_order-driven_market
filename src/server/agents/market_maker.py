@@ -1,21 +1,19 @@
 import logging
-import random
 import time
 from abc import ABC
 import json
 from statistics import stdev
-
 import numpy as np
 
-from src.client.client import Trader
+from src.client.client import AdminTrader
 from src.server.server import products
 
 logging.getLogger("urllib3").setLevel(logging.WARNING)  # suppress logging
 
 
-class MarketMaker(Trader, ABC):
+class MarketMaker(AdminTrader, ABC):
     def __init__(self, target, config, bid_ask_spread=0.5, window=10, volatility_multiplier=0.5, initial_emission=100,
-                 initial_price=100, initial_num_orders=10):
+                 initial_price=100, initial_num_orders=10, budget=10000, volume=None):
         """
         Initialize a market maker.
         :param target: Name of the server
@@ -33,6 +31,9 @@ class MarketMaker(Trader, ABC):
         - Available types: fixed number for all products same or dictionary with product specific values
         :param initial_num_orders: Initial number of orders to emit
         - Available types: fixed number for all products same or dictionary with product specific values
+        :param budget: Total budget to allocate for market making (initialization not included)
+        :param volume: Total volume to allocate for market making (initialization not included)
+        - Available types: fixed number for all products same or dictionary with product specific values
         """
         super().__init__("market_maker", target, config)
         self.bid_ask_spread = bid_ask_spread
@@ -45,6 +46,8 @@ class MarketMaker(Trader, ABC):
             if isinstance(initial_price, int) else initial_price
         self.initial_num_orders = {product: initial_num_orders for product in products} \
             if isinstance(initial_num_orders, int) else initial_num_orders
+
+        self.initialize_liquidity_engine(budget, volume)
 
     def receive_market_data(self, data):
         pass
@@ -73,7 +76,6 @@ class MarketMaker(Trader, ABC):
     def generate_market_data(self):
         while True:
             time.sleep(1)  # sleep for 1 second
-            products = ["product1"]  # TODO: Remove this line
             for product in products:
                 bids, asks = self.get_historical_mid_prices(product)
                 dynamic_spread = self.calculate_dynamic_spread(product)
@@ -90,11 +92,10 @@ class MarketMaker(Trader, ABC):
                     side = "sell"
                     price = self.mid_prices[product][-1] + dynamic_spread
                 if side:
-                    # randomly select a quantity
-                    quantity = random.randint(1, 100)
-                    # place order
-                    self.put_order({"side": side, "quantity": quantity, "price": price}, product)
-                    logging.info(f"Synthetic liquidity added: {side} order at {price} for {quantity} {product}")
+                    quantity = self.compute_quantity(product, side, price)
+                    if quantity > 0:
+                        self.put_order({"side": side, "quantity": quantity, "price": price}, product)
+                        logging.info(f"Synthetic liquidity added: {side} order at {price} for {quantity} {product}")
 
     def initialize_market(self, scale=0.5):
         for product in products:
@@ -116,8 +117,7 @@ class MarketMaker(Trader, ABC):
                     self.put_order({"side": side, "quantity": quantity, "price": price}, product)
 
 
-
 config = json.load(open("config/server_config.json"))
-market_maker = MarketMaker("server", config)
+market_maker = MarketMaker("server", config, volume={"product1": 100, "product2": 200})
 market_maker.initialize_market()
 market_maker.generate_market_data()

@@ -19,17 +19,24 @@ class EMATrader(AlgorithmicTrader):
             self.prices[product].append(self.current_mid_price[product])
         if len(self.prices[product]) > self.long_window:
             self.prices[product] = self.prices[product][1:]
+        print(self.user_balance(product)["current_balance"])
 
     def trade(self):
         for product in self.prices:
             if len(self.prices[product]) < self.long_window:
                 continue
+            if self.current_mid_price[product] is None:
+                continue
             short_ema = self.calculate_ema(self.prices[product], self.short_window)
             long_ema = self.calculate_ema(self.prices[product], self.long_window)
             if short_ema > long_ema: # Buy
-                self.put_order({"side": "buy", "quantity": 100, "price": self.current_mid_price[product]}, product)
+                quantity = self.compute_quantity(product, "buy", self.current_mid_price[product])
+                if quantity > 0:
+                    self.put_order({"side": "buy", "quantity": quantity, "price": self.current_mid_price[product]}, product)
             elif short_ema < long_ema: # Sell
-                self.put_order({"side": "sell", "quantity": 100, "price": self.current_mid_price[product]}, product)
+                quantity = self.compute_quantity(product, "sell", self.current_mid_price[product])
+                if quantity > 0:
+                    self.put_order({"side": "sell", "quantity": quantity, "price": self.current_mid_price[product]}, product)
 
     def calculate_ema(self, prices, window):
         weights = np.exp(np.linspace(-1., 0., window))
@@ -38,6 +45,7 @@ class EMATrader(AlgorithmicTrader):
         return ema[-1]
 
 config = json.load(open("config/server_config.json"))
-momentum_trader = EMATrader("EMA_trader", "server", config)
-momentum_trader.start_subscribe()
+EMA_trader = EMATrader("EMA_trader", "server", config)
+EMA_trader.register(1000)
+EMA_trader.start_subscribe()
 

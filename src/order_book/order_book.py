@@ -178,7 +178,7 @@ class OrderBook:
         logging.debug(
             f"ORDERBOOK: Modified Order {order_id} ({order.side}): {order.quantity} shares at ${order.price:.2f}")
 
-    def modify_user_balance(self, user_id, amount, volume, side):
+    def modify_user_balance(self, user_id, amount, volume, side=None):
         """
         Modify the balance of a user.
         :param user_id: User ID
@@ -193,6 +193,9 @@ class OrderBook:
         elif side == 'sell':
             self.user_balance[user_id]['balance'] += amount
             self.user_balance[user_id]['volume'] -= volume
+        else: # No side specified
+            self.user_balance[user_id]['balance'] += amount
+            self.user_balance[user_id]['volume'] += volume
 
     def get_best_bid(self):
         """
