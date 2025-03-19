@@ -172,17 +172,6 @@ class Trader (Subscriber, ABC):
         :param product: Product name
         :return: Order ID if not fully filled, None otherwise
         """
-        # Check if the user has enough volume to place the order
-        if order["side"] == "sell":
-            user_balance = self.user_balance(product, verbose=False)
-            if user_balance is None:
-                print("\033[91mError: User balance not found.\033[0m")  # Print in red
-                return None
-            user_balance = user_balance["history_balance"][-1]["volume"]
-            if order["quantity"] > user_balance:
-                print("\033[91mError: Insufficient order volume.\033[0m")  # Print in red
-                return None
-
         data = {"order": order, "product": product, "msg_type": "NewOrderSingle"}
         message = self.PROTOCOL.encode(data)
 
@@ -406,7 +395,7 @@ class Trader (Subscriber, ABC):
         owned_volume = sys.maxsize
         post_buy_budget = sys.maxsize
         if side == "sell": # If selling, use the current owned volume
-            owned_volume = user_balance["current_balance"]["volume"]
+            owned_volume = user_balance["current_balance"]["post_sell_volume"]
             available_volume = pd.DataFrame(order_book_data['Bids'])
         else: # If buying, use the post-buy budget
             post_buy_budget = user_balance["post_buy_budget"] * ratio

@@ -25,7 +25,7 @@ class OrderBook:
             'sell': self.asks
         }
 
-        self.user_balance = defaultdict(lambda: {'balance': 0, 'volume': 0})  # Key: User ID
+        self.user_balance = defaultdict(lambda: {'balance': 0, 'volume': 0, 'post_sell_volume': 0})
         self.timestamp = 0 # Timestamp in which the order book was last saved
 
     def copy(self):
@@ -44,7 +44,7 @@ class OrderBook:
             'sell': self.asks
         }
 
-        self.user_balance = defaultdict(lambda: {'balance': 0, 'volume': 0})
+        self.user_balance = defaultdict(lambda: {'balance': 0, 'volume': 0, 'post_sell_volume': 0})
 
         logging.debug("ORDERBOOK: Order book reset.")
 
@@ -178,12 +178,13 @@ class OrderBook:
         logging.debug(
             f"ORDERBOOK: Modified Order {order_id} ({order.side}): {order.quantity} shares at ${order.price:.2f}")
 
-    def modify_user_balance(self, user_id, amount, volume, side=None):
+    def modify_user_balance(self, user_id, amount=0, volume=0, post_sell_volume=0, side=None):
         """
         Modify the balance of a user.
         :param user_id: User ID
         :param amount: Amount to modify the balance by
         :param volume: Volume to modify the balance by
+        :param post_sell_volume: Volume to modify the balance by after a sell
         :param side: Side of the transaction ('buy' or 'sell')
         :return: None
         """
@@ -196,6 +197,7 @@ class OrderBook:
         else: # No side specified
             self.user_balance[user_id]['balance'] += amount
             self.user_balance[user_id]['volume'] += volume
+            self.user_balance[user_id]['post_sell_volume'] += post_sell_volume
 
     def get_best_bid(self):
         """

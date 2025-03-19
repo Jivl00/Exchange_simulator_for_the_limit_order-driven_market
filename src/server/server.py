@@ -1,3 +1,5 @@
+import traceback
+
 import tornado.ioloop
 import tornado.web
 import tornado.websocket
@@ -82,6 +84,7 @@ class MsgHandler(tornado.web.RequestHandler):
             response = handler(message)
         except Exception as e:
             logging.error(e)
+            logging.error(traceback.format_exc())
             self.set_status(500)
             self.write({"error": "Internal server error"})
             logging.error(f"Error in handling message: {e}")
@@ -104,6 +107,18 @@ class MsgHandler(tornado.web.RequestHandler):
                                for order in order_book.get_orders_by_user(user_ID) if order.side == "buy")
         user_manager.users[user_ID].post_buy_budget = initial_budget - buy_orders_value + balance
 
+    @staticmethod
+    def update_user_post_sell_volume(user_ID, product):
+        """
+        Update the user's post-buy budget.
+        :param user_ID: User ID
+        :param product: Product name
+        """
+        volume = product_manager.get_order_book(product, False).user_balance[user_ID]["volume"]
+        # Get all sell orders of the user and update the post-sell volume
+        sell_orders_volume = sum(order.quantity for order in product_manager.get_order_book(product, False)
+                                 .get_orders_by_user(user_ID) if order.side == "sell")
+        product_manager.get_order_book(product, False).user_balance[user_ID]["post_sell_volume"] = volume - sell_orders_volume
 
 class TradingHandler(MsgHandler):
     @staticmethod
@@ -151,6 +166,14 @@ class TradingHandler(MsgHandler):
             TradingHandler.update_user_post_buy_budget(message["order"]["user"])
             if user_manager.users[message["order"]["user"]].post_buy_budget < message["order"]["quantity"] * message["order"]["price"]:
                 return protocol.encode({"order_id": -1, "status": False, "msg_type": "ExecutionReport"})
+
+        # If the order is a sell order, check if the user has enough shares to sell
+        if message["order"]["side"] == "sell":
+            TradingHandler.update_user_post_sell_volume(message["order"]["user"], product)
+            user_shares = product_manager.get_order_book(product, False).user_balance[message["user"]]["post_sell_volume"]
+            if user_shares < message["order"]["quantity"]:
+                return protocol.encode({"order_id": -1, "status": False, "msg_type": "ExecutionReport"})
+
         timestamp = time.time_ns()
         order = Order(
             str(ID),  # Order ID
@@ -191,8 +214,16 @@ class TradingHandler(MsgHandler):
         order = product_manager.get_order_book(product, False).get_order_by_id(order_id)
         if order is None:
             return protocol.encode({"order_id": order_id, "status": False, "msg_type": "ExecutionReportCancel"})
-        product_manager.get_order_book(product, time.time_ns()).delete_order(order_id)
+        if order.user != message["user"]: # Check if the user is the owner of the order
+            return protocol.encode({"order_id": order_id, "status": False, "msg_type": "ExecutionReportCancel"})
+        product_manager.get_order_book(product, timestamp=time.time_ns()).delete_order(order_id)
         protocol.set_target(order.user)
+
+        # Broadcast the order book to all clients
+        broadcast_response = protocol.encode(
+            {"order_book": product_manager.get_order_book(product, False).jsonify_order_book(),
+             "product": product, "msg_type": "MarketDataSnapshot"})
+        WebSocketHandler.broadcast(broadcast_response)
         return protocol.encode({"order_id": order_id, "status": True, "msg_type": "ExecutionReportCancel"})
 
     @staticmethod
@@ -285,6 +316,7 @@ class QuoteHandler(MsgHandler):
         :return: server response
         """
         cls.update_user_post_buy_budget(message["user"])
+        cls.update_user_post_sell_volume(message["user"], message["product"])
         product = message["product"]
         if not product_exists(product):
             return protocol.encode({"user_balance": None, "msg_type": "UserBalance"})

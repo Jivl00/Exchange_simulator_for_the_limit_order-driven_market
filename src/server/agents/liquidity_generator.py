@@ -51,6 +51,7 @@ class SyntheticLiquidityProvider(AdminTrader, ABC):
                 logging.info(f"Synthetic liquidity added: {side} order at {price} for {quantity} {product}")
                 print(self.user_balance(product)["current_balance"])
 
-config = json.load(open("config/server_config.json"))
-liquidity_generator = SyntheticLiquidityProvider("server", config)
-liquidity_generator.generate_liquidity()
+if __name__ == "__main__":
+    config = json.load(open("config/server_config.json"))
+    liquidity_generator = SyntheticLiquidityProvider("server", config)
+    liquidity_generator.generate_liquidity()
