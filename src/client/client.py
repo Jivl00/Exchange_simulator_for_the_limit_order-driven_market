@@ -2,6 +2,7 @@ import json
 import asyncio
 import inspect
 import sys
+import time
 
 import requests
 import pandas as pd
@@ -413,6 +414,27 @@ class Trader (Subscriber, ABC):
 
         quantity = min(available_volume, int(post_buy_budget / price), owned_volume)
         return quantity
+
+
+    def delete_dispensable_orders(self, product, price, price_threshold,  history_lookback_threshold=60):
+        """
+        Delete dispensable orders - orders with a price difference greater than the threshold or older than the lookback threshold.
+        :param product: Product name
+        :param price: Current traded price
+        :param price_threshold: Threshold for price difference - if the price difference is greater than this, cancel the order
+        :param history_lookback_threshold: Maximum age of orders in seconds. Orders older than this threshold will be considered for cancellation.
+        :return: List of dispensable order IDs
+        """
+        user_orders = self.list_user_orders(product)
+        if user_orders is None:
+            print("\033[91mError: No user orders found.\033[0m")
+
+        current_time = time.time() # Current time in seconds
+        for i, order in user_orders.items():
+            if (abs(order["price"] - price) > price_threshold or
+                (current_time - (order["timestamp"] / 1e9)) > history_lookback_threshold):
+                self.delete_order(order["id"], product)
+
 
 class AdminTrader(Trader, ABC):
     """
