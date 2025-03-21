@@ -1,3 +1,8 @@
+import os
+import sys
+sys.path.append(os.path.join(os.path.dirname(__file__), '../..'))
+sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
+
 import traceback
 
 import tornado.ioloop
@@ -65,7 +70,12 @@ class MsgHandler(tornado.web.RequestHandler):
         Handles requests from the client.
         :return: None
         """
-        message = json.loads(self.request.body)
+        try:
+            message = json.loads(self.request.body)
+        except json.JSONDecodeError:
+            self.set_status(400)
+            self.write({"error": "Invalid JSON format"})
+            return
         logging.info(f"R> {message['message']}")
         msg_type = message["msg_type"]
 
