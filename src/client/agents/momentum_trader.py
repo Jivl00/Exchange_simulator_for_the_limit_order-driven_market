@@ -16,8 +16,8 @@ class MomentumTrader(AlgorithmicTrader):
             self.momentum[product].append(self.current_mid_price[product])
         if len(self.momentum[product]) > self.lookback:
             self.momentum[product] = self.momentum[product][1:]
-        print("Momentum", product, self.momentum[product])
-        print(self.user_balance(product)["current_balance"])
+        print(self.user_balance(product, verbose=False)["current_balance"])
+        self.delete_dispensable_orders(product, self.current_mid_price[product], 1, 60)
 
     def trade(self):
         for product in self.momentum:

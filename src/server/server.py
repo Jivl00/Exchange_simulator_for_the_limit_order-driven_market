@@ -8,7 +8,7 @@ import logging
 import time
 import uuid
 
-from order_book.product_manager import TradingProductManager
+from src.order_book.product_manager import TradingProductManager
 from src.server.user_manager import UserManager
 from src.order_book.order import Order
 from src.protocols.FIXProtocol import FIXProtocol

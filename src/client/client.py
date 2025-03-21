@@ -428,6 +428,10 @@ class Trader (Subscriber, ABC):
         user_orders = self.list_user_orders(product)
         if user_orders is None:
             print("\033[91mError: No user orders found.\033[0m")
+            return
+        if price is None:
+            print("\033[91mError: Current price not found.\033[0m")
+            return
 
         current_time = time.time() # Current time in seconds
         for i, order in user_orders.items():

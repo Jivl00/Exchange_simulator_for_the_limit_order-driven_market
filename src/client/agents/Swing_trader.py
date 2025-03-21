@@ -12,21 +12,22 @@ class SwingTrader(AlgorithmicTrader):
     def handle_market_data(self, message):
         product = message["product"]
         self.products.add(product)
-        print(self.user_balance(product)["current_balance"])
+        print(self.user_balance(product, verbose=False)["current_balance"])
+        self.delete_dispensable_orders(product, self.current_mid_price[product], 1, 60)
 
     def trade(self):
-        pass
-        # for product in self.products:
-        #     if product not in self.current_mid_price:
-        #         continue
-        #     if self.current_mid_price[product] and self.current_mid_price[product] < self.support_level: # Buy
-        #         quantity = self.compute_quantity(product, "buy", self.current_mid_price[product])
-        #         if quantity > 0:
-        #             self.put_order({"side": "buy", "quantity": quantity, "price": self.current_mid_price[product]}, product)
-        #     elif self.current_mid_price[product] and self.current_mid_price[product] >= self.resistance_level: # Sell
-        #         quantity = self.compute_quantity(product, "sell", self.current_mid_price[product])
-        #         if quantity > 0:
-        #             self.put_order({"side": "sell", "quantity": quantity, "price": self.current_mid_price[product]}, product)
+        # pass
+        for product in self.products:
+            if product not in self.current_mid_price:
+                continue
+            if self.current_mid_price[product] and self.current_mid_price[product] < self.support_level: # Buy
+                quantity = self.compute_quantity(product, "buy", self.current_mid_price[product])
+                if quantity > 0:
+                    self.put_order({"side": "buy", "quantity": quantity, "price": self.current_mid_price[product]}, product)
+            elif self.current_mid_price[product] and self.current_mid_price[product] >= self.resistance_level: # Sell
+                quantity = self.compute_quantity(product, "sell", self.current_mid_price[product])
+                if quantity > 0:
+                    self.put_order({"side": "sell", "quantity": quantity, "price": self.current_mid_price[product]}, product)
 
 config = json.load(open("config/server_config.json"))
 swing_trader = SwingTrader("swing_trader", "server", config)

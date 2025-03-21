@@ -19,7 +19,8 @@ class EMATrader(AlgorithmicTrader):
             self.prices[product].append(self.current_mid_price[product])
         if len(self.prices[product]) > self.long_window:
             self.prices[product] = self.prices[product][1:]
-        print(self.user_balance(product)["current_balance"])
+        print(self.user_balance(product, verbose=False)["current_balance"])
+        self.delete_dispensable_orders(product, self.current_mid_price[product], 1, 60)
 
     def trade(self):
         for product in self.prices:
