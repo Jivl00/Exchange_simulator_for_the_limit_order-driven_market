@@ -171,7 +171,7 @@ class Trader (Subscriber, ABC):
         Send a new order request to the server.
         :param order: Dictionary containing order details
         :param product: Product name
-        :return: Order ID if not fully filled, None otherwise
+        :return: Order ID and status (True if successful, None if fully filled, False otherwise)
         """
         data = {"order": order, "product": product, "msg_type": "NewOrderSingle"}
         message = self.PROTOCOL.encode(data)
@@ -180,14 +180,14 @@ class Trader (Subscriber, ABC):
                                  json={"message": message, "msg_type": data["msg_type"]})
         response = self.parse_response(response)
         if response is None:
-            return None
+            return None, False
         response["msg_type"] = "ExecutionReport"
         response_data = self.PROTOCOL.decode(response)
         if response_data is None or response_data.get("status") is False:
             print("\033[91mError: Order put failed. Please check the order details and remaining balance.\033[0m")
-            return None
+            return None, False
 
-        return response_data["order_id"] if response_data["status"] else None
+        return response_data["order_id"], response_data["status"]
 
     def delete_order(self, ID, product):
         """

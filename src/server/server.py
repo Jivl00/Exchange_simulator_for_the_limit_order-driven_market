@@ -21,7 +21,7 @@ from src.protocols.FIXProtocol import FIXProtocol
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
 logging.getLogger("tornado.access").disabled = True
 
-config = json.load(open("config/server_config.json"))
+config = json.load(open("../config/server_config.json"))
 MSG_SEQ_NUM = 0
 ID = 0
 
@@ -96,7 +96,7 @@ class MsgHandler(tornado.web.RequestHandler):
             logging.error(e)
             logging.error(traceback.format_exc())
             self.set_status(500)
-            self.write({"error": "Internal server error"})
+            self.write({"error": f"Error in handling message: {e}"})
             logging.error(f"Error in handling message: {e}")
             return
         logging.debug(f"S> {response}")
@@ -171,6 +171,13 @@ class TradingHandler(MsgHandler):
         product = message["product"]
         if not product_exists(product):
             return protocol.encode({"order_id": -1, "status": False, "msg_type": "ExecutionReport"})
+
+        # Check order details viability
+        if message["order"]["side"] not in ["buy", "sell"]:
+            return protocol.encode({"order_id": -1, "status": False, "msg_type": "ExecutionReport"})
+        if message["order"]["quantity"] <= 0 or message["order"]["price"] <= 0:
+            return protocol.encode({"order_id": -1, "status": False, "msg_type": "ExecutionReport"})
+
         # If the order is a buy order, check if the user has enough budget to place the order
         if message["order"]["side"] == "buy":
             TradingHandler.update_user_post_buy_budget(message["order"]["user"])
