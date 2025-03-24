@@ -1,11 +1,10 @@
-
-
 class User:
     def __init__(self, name, ID, budget):
         self.name = name
         self.user_ID = ID
         self.budget = budget
         self.post_buy_budget = budget
+
 
 class UserManager:
     def __init__(self):
@@ -23,5 +22,3 @@ class UserManager:
 
     def user_exists(self, user_ID):
         return user_ID in self.users
-
-
