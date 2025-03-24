@@ -393,6 +393,7 @@ class Trader (Subscriber, ABC):
             print("\033[91mError: Order book not found.\033[0m")
             return 0
 
+        quantity = 0
         owned_volume = sys.maxsize
         post_buy_budget = sys.maxsize
         if side == "sell": # If selling, use the current owned volume
@@ -411,8 +412,8 @@ class Trader (Subscriber, ABC):
                 available_volume = available_volume['Quantity'][0]  # Top of the book
         else:
             available_volume = 0
-
-        quantity = min(available_volume, int(post_buy_budget / price), owned_volume)
+        if price != 0:
+            quantity = min(available_volume, int(post_buy_budget / price), owned_volume)
         return quantity
 
 
