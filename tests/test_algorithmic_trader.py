@@ -3,17 +3,20 @@ import unittest
 import subprocess
 import time
 import logging
+
+import requests
+
 from src.client.algorithmic_trader import AlgorithmicTrader
 from src.client.client import AdminTrader
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-#TODO: better assert messages + more tests
+python_path = "C:\\Users\\vladka\\PycharmProjects\\pythonProject\\venv\\Scripts\\python.exe"
+
 class TestAdminTrader(AdminTrader):
     def receive_market_data(self, data):
-        # Implement the abstract method
-        pass
+        pass # Required implementation for abstract class
 
 
 class TestAlgorithmicTraderIntegration(unittest.TestCase):
@@ -21,22 +24,41 @@ class TestAlgorithmicTraderIntegration(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
+        """
+        Start the server and initialize the AlgorithmicTrader for integration tests.
+        """
         # Start the server using subprocess
         logger.info("Starting the server...")
-        # TODO: Change the path to python.exe based on your environment
-        cls.server_process = subprocess.Popen(
-            ["C:\\Users\\vladka\\PycharmProjects\\pythonProject\\venv\\Scripts\\python.exe", "..\src\server\server.py"],
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL
-        )
-        # cls.server_process = subprocess.Popen(["python.exe", "..\src\server\server.py"])
-        time.sleep(5)  # Allow server time to start
+        try:
+            cls.server_process = subprocess.Popen(
+                [python_path, "..\src\server\server.py"],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL
+            )
+            # Periodically check if the server has started
+            server_started = False
+            config = json.load(open("../config/server_config.json"))
+            for _ in range(10):
+                try:
+                    port = config["PORT"]
+                    response = requests.get(f"http://localhost:{port}")
+                    if response.status_code == 200:
+                        server_started = True
+                        break
+                except requests.exceptions.ConnectionError:
+                    time.sleep(1)
 
-        config = json.load(open("../config/server_config.json"))
-        cls.trader = AlgorithmicTrader("TestTrader", "Server1", config)
-        cls.tester = TestAdminTrader("liquidity_generator", "Server1", config)
-        cls.tester.initialize_liquidity_engine(10000, 10000)
-        logger.info("Initialized AlgorithmicTrader for Integration Tests")
+            if not server_started:
+                raise Exception("Failed to start the server. Exiting...")
+
+            cls.trader = AlgorithmicTrader("TestTrader", "Server1", config)
+            cls.tester = TestAdminTrader("liquidity_generator", "Server1", config)
+            cls.tester.initialize_liquidity_engine(10000, 10000)
+            logger.info("Server started and AlgorithmicTrader initialized.")
+        except Exception as e:
+            logger.error(f"Error starting the server: {e}")
+            cls.tearDownClass()
+            raise
 
     @classmethod
     def tearDownClass(cls):
@@ -64,13 +86,16 @@ class TestAlgorithmicTraderIntegration(unittest.TestCase):
 
     def clean_up(self):
         """
-        Clean up by removing all orders after each test.
+        Clean up by removing all orders from the trader and tester after each test.
         """
-        logger.info("Cleaning up after the test...")
+        logger.info("Cleaning up user orders...")
         for trader in [self.trader, self.tester]:
-            all_orders = trader.list_user_orders("product1")
-            for order_id in all_orders:
-                trader.delete_order(order_id, "product1")
+            try:
+                all_orders = trader.list_user_orders("product1")
+                for order_id in all_orders:
+                    trader.delete_order(order_id, "product1")
+            except Exception as e:
+                logger.error(f"Error during cleanup: {e}")
 
     def test_scenario_1(self):
         """
@@ -126,7 +151,6 @@ class TestAlgorithmicTraderIntegration(unittest.TestCase):
         post_buy_budget = balance["post_buy_budget"]
         self.assertGreaterEqual(post_buy_budget, 999)
 
-
     def test_scenario_2(self):
         """
         Scenario 2: User Order Book and Balance Evaluation
@@ -171,7 +195,6 @@ class TestAlgorithmicTraderIntegration(unittest.TestCase):
         self.assertEqual(balance, -500)  # 5*100 = 500 spent
         logger.info(f"User balance: {balance}")
 
-
     def test_scenario_3(self):
         """
         Scenario 3: Bulk Order Management
@@ -215,7 +238,6 @@ class TestAlgorithmicTraderIntegration(unittest.TestCase):
             self.assertEqual(status, expected_statuses[i])
             order_ids.append(order_id)
             logger.info(f"Order {i + 1} placed with ID: {order_id}")
-
 
     def test_scenario_4(self):
         """
