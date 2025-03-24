@@ -73,9 +73,6 @@ class Subscriber(ABC):
             data = json.loads(msg)
             data["msg_type"] = "MarketDataSnapshot"
             data = self.protocol.decode(data)
-            product = data["product"]
-            order_book_data = data["order_book"]
-            Trader.display_order_book(order_book_data, product=product)
             self.receive_market_data(data)
 
     @abstractmethod

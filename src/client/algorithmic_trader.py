@@ -22,6 +22,7 @@ class AlgorithmicTrader (Trader):
         Receives market data and updates stored market information.
         :param message:  Market data message
         """
+        Trader.display_order_book(message["order_book"], product=message["product"])
         bids = message["order_book"]["Bids"]
         asks = message["order_book"]["Asks"]
         product = message["product"]
