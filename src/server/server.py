@@ -4,7 +4,8 @@ sys.path.append(os.path.join(os.path.dirname(__file__), '../..'))
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 
 import traceback
-
+import atexit
+import pickle
 import tornado.ioloop
 import tornado.web
 import tornado.websocket
@@ -339,9 +340,9 @@ class QuoteHandler(MsgHandler):
             return protocol.encode({"user_balance": None, "msg_type": "UserBalance"})
         historical_books = product_manager.historical_order_books[product]
         user_balances = [
-            {**book.user_balance[message["user"]], 'timestamp': book.timestamp}
+            {**book_data["UserBalance"][message["user"]], 'timestamp': book_data['Timestamp']}
             for book in historical_books
-            if message["user"] in book.user_balance
+            if (book_data := json.loads(book)) and message["user"] in book_data["UserBalance"]
         ]
         # Add current balance
         user_balances.append(product_manager.get_order_book(product, False).user_balance[message["user"]])
@@ -364,7 +365,7 @@ class QuoteHandler(MsgHandler):
             return protocol.encode({"report": None, "msg_type": "CaptureReport"})
         report = product_manager.get_historical_order_books(product, message["history_len"])
         # Add current order book to the historical report
-        report.append(product_manager.get_order_book(product, False).copy())
+        report.append(product_manager.get_order_book(product, False).copy().jsonify_order_book())
         return protocol.encode({"history": report, "msg_type": "CaptureReport"})
 
     msg_type_handlers = {
@@ -429,6 +430,18 @@ def make_app():
         (r"/websocket", WebSocketHandler),
     ], debug=True, autoreload=True)
 
+def save_data():
+    data_to_save = {}
+    for product in products:
+        report = product_manager.get_historical_order_books(product, -1)
+        report.append(product_manager.get_order_book(product, False).copy().jsonify_order_book())
+        data_to_save[product] = {"order_books": report, "users": user_manager.users}
+    with open('server_data.pickle', 'wb') as f:
+        pickle.dump(data_to_save, f)
+    print("Data saved to server_data.pickle")
+
+# Register the save_data function to be called at exit
+atexit.register(save_data)
 
 if __name__ == "__main__":
     app = make_app()

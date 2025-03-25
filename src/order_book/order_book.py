@@ -272,6 +272,7 @@ class OrderBook:
         order_book_data = {
             'Bids': bids,
             'Asks': asks,
+            'UserBalance': self.user_balance,
             'Timestamp': self.timestamp
         }
 

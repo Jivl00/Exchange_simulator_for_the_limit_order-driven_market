@@ -13,13 +13,15 @@ class TradingProductManager:
             raise ValueError("Timestamp must be provided if save_history is True")
         if save_history:
             self.order_books[product].timestamp = self.order_books[product].timestamp + 1
-            self.historical_order_books[product].append(self.order_books[product].copy())
+            self.historical_order_books[product].append(self.order_books[product].copy().jsonify_order_book())
         return self.order_books.get(product)
 
     def get_matching_engine(self, product, timestamp):
         self.order_books[product].timestamp = timestamp
-        self.historical_order_books[product].append(self.order_books[product].copy())
+        self.historical_order_books[product].append(self.order_books[product].copy().jsonify_order_book())
         return self.matching_engines.get(product)
 
     def get_historical_order_books(self, product, history_length):
+        if history_length == -1:
+            return self.historical_order_books[product]
         return self.historical_order_books[product][-history_length:]
