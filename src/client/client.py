@@ -180,7 +180,7 @@ class Trader (Subscriber, ABC):
             return None, False
         response["msg_type"] = "ExecutionReport"
         response_data = self.PROTOCOL.decode(response)
-        if response_data is None or response_data.get("status") is False:
+        if response_data.get("status") is False:
             print("\033[91mError: Order put failed. Please check the order details and remaining balance.\033[0m")
             return None, False
 
