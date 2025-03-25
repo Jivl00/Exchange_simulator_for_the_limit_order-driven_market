@@ -35,7 +35,7 @@ class MomentumTrader(AlgorithmicTrader):
                 if quantity > 0:
                     self.put_order({"side": "sell", "quantity": quantity, "price": self.current_mid_price[product]}, product)
 
-config = json.load(open("config/server_config.json"))
+config = json.load(open("../config/server_config.json"))
 momentum_trader = MomentumTrader("momentum_trader", "server", config)
 momentum_trader.register(1000)
 momentum_trader.start_subscribe()
