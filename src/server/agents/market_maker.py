@@ -12,8 +12,8 @@ logging.getLogger("urllib3").setLevel(logging.WARNING)  # suppress logging
 
 
 class MarketMaker(AdminTrader, ABC):
-    def __init__(self, target, config, bid_ask_spread=0.5, window=10, volatility_multiplier=0.5, initial_emission=100,
-                 initial_price=100, initial_num_orders=10, budget=10000, volume=None):
+    def __init__(self, target, config, bid_ask_spread=0.5, window=10, volatility_multiplier=0.5, initial_emission=500,
+                 starting_price=100, initial_num_orders=10, budget=50000, volume=None):
         """
         Initialize a market maker.
         :param target: Name of the server
@@ -27,7 +27,7 @@ class MarketMaker(AdminTrader, ABC):
         - Lower values (e.g., 0.2 - 0.4) → Keeps the spread tight, increasing trade frequency but raising risk.
         :param initial_emission: Initial volume of liquidity to emit
         - Available types: fixed number for all products same or dictionary with product specific values
-        :param initial_price: Initial price to start emitting liquidity
+        :param starting_price: Starting value for the mid-price
         - Available types: fixed number for all products same or dictionary with product specific values
         :param initial_num_orders: Initial number of orders to emit
         - Available types: fixed number for all products same or dictionary with product specific values
@@ -42,8 +42,8 @@ class MarketMaker(AdminTrader, ABC):
         self.mid_prices = {}
         self.initial_emission = {product: initial_emission for product in products} \
             if isinstance(initial_emission, int) else initial_emission
-        self.initial_price = {product: initial_price for product in products} \
-            if isinstance(initial_price, int) else initial_price
+        self.starting_price = {product: starting_price for product in products} \
+            if isinstance(starting_price, int) else starting_price
         self.initial_num_orders = {product: initial_num_orders for product in products} \
             if isinstance(initial_num_orders, int) else initial_num_orders
 
@@ -97,27 +97,29 @@ class MarketMaker(AdminTrader, ABC):
                         self.put_order({"side": side, "quantity": quantity, "price": price}, product)
                         logging.info(f"Synthetic liquidity added: {side} order at {price} for {quantity} {product}")
 
-    def initialize_market(self, scale=0.5):
+    def initialize_market(self, scale=0.1):
         for product in products:
             num_orders = self.initial_num_orders[product]
-            bid_prices = np.sort(self.initial_price[product] - np.random.exponential(scale, num_orders))
-            ask_prices = np.sort(self.initial_price[product] + np.random.exponential(scale, num_orders))[::-1]
+            bid_prices = np.sort(self.starting_price[product] - np.random.exponential(scale * num_orders, num_orders))
+            ask_prices = np.sort(self.starting_price[product] + np.random.exponential(scale * num_orders, num_orders))[::-1]
 
-            remaining_quantity = self.initial_emission[product]
-            bid_weights = np.exp(-np.arange(num_orders))  # More volume near best bid
-            ask_weights = np.exp(-np.arange(num_orders))  # More volume near best ask
+            bid_weights = np.sort(np.random.exponential(scale * num_orders, num_orders))[::-1]
+            ask_weights = np.sort(np.random.exponential(scale * num_orders, num_orders))[::-1]
             bid_weights /= bid_weights.sum()
             ask_weights /= ask_weights.sum()
 
-            for side, prices, weights in [("buy", bid_prices, bid_weights), ("sell", ask_prices, ask_weights)]:
+            bid_quantities = (self.initial_emission[product]//2 * bid_weights).astype(int)
+            ask_quantities = (self.initial_emission[product]//2 * ask_weights).astype(int)
+
+            for side, prices, quantities in [("buy", bid_prices, bid_quantities),
+                                            ("sell", ask_prices, ask_quantities)]:
                 for i, price in enumerate(prices):
-                    if remaining_quantity <= 0:
-                        break
-                    quantity = min(int(self.initial_emission[product] * weights[i]), remaining_quantity)
+                    quantity = max(1, quantities[i])
                     self.put_order({"side": side, "quantity": quantity, "price": price}, product)
+                    print(f"Initial liquidity added: {side} order at {price} for {quantity} {product}")
 
 
-config = json.load(open("config/server_config.json"))
-market_maker = MarketMaker("server", config, volume={"product1": 100, "product2": 200})
+config = json.load(open("../config/server_config.json"))
+market_maker = MarketMaker("server", config, volume={"product1": 1000, "product2": 200})
 market_maker.initialize_market()
 market_maker.generate_market_data()
