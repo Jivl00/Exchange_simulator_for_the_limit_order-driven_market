@@ -5,6 +5,9 @@ class User:
         self.budget = budget
         self.post_buy_budget = budget
 
+    def __str__(self):
+        return f"User {self.name} ({self.user_ID}) with budget {self.budget}"
+
 
 class UserManager:
     def __init__(self):
