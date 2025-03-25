@@ -4,6 +4,7 @@ import subprocess
 import time
 import logging
 import requests
+import colorlog
 
 from src.client.algorithmic_trader import AlgorithmicTrader
 from src.client.client import AdminTrader
@@ -29,7 +30,18 @@ def configure_test_logging():
     ch.setLevel(logging.INFO)
 
     # Create a formatter for the log messages
-    formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+    formatter = colorlog.ColoredFormatter(
+        "%(log_color)s%(asctime)s - %(levelname)s - %(message)s",
+        datefmt=None,
+        reset=True,
+        log_colors={
+            'DEBUG': 'cyan',
+            'INFO': 'green',
+            'WARNING': 'yellow',
+            'ERROR': 'red',
+            'CRITICAL': 'bold_red',
+        }
+    )
     ch.setFormatter(formatter)
 
     # Add the console handler to the logger
