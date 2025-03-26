@@ -7,6 +7,7 @@ import tornado
 from bokeh.server.server import Server
 from bokeh.application import Application as BkApplication
 from bokeh.application.handlers.function import FunctionHandler
+from bokeh.models import DatetimeTickFormatter
 from bokeh.plotting import figure
 from bokeh.layouts import column, row
 from bokeh.models import (
@@ -34,7 +35,6 @@ def main_page(doc):
     trader = WebTrader("bokeh", "server", config)
     trader.register(initial_balance)
 
-    mid_prices = []
     local_balance = initial_balance
     local_volume = 0
 
@@ -42,7 +42,7 @@ def main_page(doc):
     balance_text = Div(text=f"<h3>Balance: ${local_balance:.2f}</h3>", width=300)
     volume_text = Div(text=f"<h3>Volume: {local_volume} lots</h3>", width=300)
 
-    price_source = ColumnDataSource(data={'x': [], 'y': []})
+    price_source = ColumnDataSource(data={'x': [], 'mid_price': [], 'bid_price': [], 'ask_price': []})
     order_source = ColumnDataSource(data={'ID': [], 'price': [], 'quantity': [], 'side': []})
     hist_source = ColumnDataSource(data={'left': [], 'right': [], 'bid_top': [], 'ask_top': []})
 
@@ -66,8 +66,12 @@ def main_page(doc):
     # =====================
     # Graphs
     # =====================
-    price_fig = figure(title="Price Chart", width=600, height=300, sizing_mode="stretch_width")
-    price_fig.line('x', 'y', source=price_source, line_width=2)
+    price_fig = figure(title="Price Chart", width=600, height=300, sizing_mode="stretch_width", x_axis_type="datetime")
+    price_fig.line('x', 'mid_price', source=price_source, line_width=2, color='blue', alpha=0.5, legend_label='Mid Price')
+    price_fig.line('x', 'bid_price', source=price_source, line_width=4, color='green', alpha=0.5, legend_label='Bid Price')
+    price_fig.line('x', 'ask_price', source=price_source, line_width=4, color='red', alpha=0.5, legend_label='Ask Price')
+
+    price_fig.xaxis.formatter = DatetimeTickFormatter(seconds="%H:%M:%S")
 
     hist_fig = figure(title="Order Book", width=600, height=300, sizing_mode="stretch_width")
     hist_fig.quad(top='bid_top', bottom=0, left='left', right='right',
@@ -114,21 +118,25 @@ def main_page(doc):
 
 
     def update_price(order_book):
-        nonlocal mid_prices
         bids = order_book["Bids"]
         asks = order_book["Asks"]
         # datetime.datetime.min + datetime.timedelta(seconds=t // 1e9)
         time = order_book["Timestamp"]/1e9 # Convert nanoseconds to seconds
-        # time = datetime.datetime.fromtimestamp(time).strftime("%H:%M:%S")
+        time = datetime.datetime.fromtimestamp(time)
         if bids and asks:
-            mid_prices.append((bids[0]["Price"] + asks[0]["Price"]) / 2)
-            mid_price = mid_prices[-1]
+            # mid_price = (bids[0]["Price"] + asks[0]["Price"]) / 2
+            mid_price = np.nan
+            bid_price = bids[0]["Price"] if bids else np.nan
+            ask_price = asks[0]["Price"] if asks else np.nan
             # print(f"Mid price: {mid_price}")
             # print(f"Time: {time}")
 
-            # new_data = {'x': [len(price_source.data['x'])], 'y': [100 + np.random.randn()]}
-            # price_source.stream(new_data, rollover=50)
-            new_data = {'x': [time], 'y': [mid_price]}
+            new_data = {
+                'x': [time],
+                'mid_price': [mid_price],
+                'bid_price': [bid_price],
+                'ask_price': [ask_price],
+            }
             price_source.stream(new_data, rollover=50)
 
     def send_order():
