@@ -9,6 +9,7 @@ from bokeh.application import Application as BkApplication
 from bokeh.application.handlers.function import FunctionHandler
 from bokeh.models import DatetimeTickFormatter
 from bokeh.plotting import figure
+from bokeh.models import Legend
 from bokeh.layouts import column, row
 from bokeh.models import (
     ColumnDataSource, DataTable, TableColumn, Button, TextInput,
@@ -67,11 +68,20 @@ def main_page(doc):
     # Graphs
     # =====================
     price_fig = figure(title="Price Chart", width=600, height=300, sizing_mode="stretch_width", x_axis_type="datetime")
-    price_fig.line('x', 'mid_price', source=price_source, line_width=2, color='blue', alpha=0.5, legend_label='Mid Price')
-    price_fig.line('x', 'bid_price', source=price_source, line_width=4, color='green', alpha=0.5, legend_label='Bid Price')
-    price_fig.line('x', 'ask_price', source=price_source, line_width=4, color='red', alpha=0.5, legend_label='Ask Price')
+    mid_line = price_fig.line('x', 'mid_price', source=price_source, line_width=2, color='blue', alpha=0.5,
+                              )
+    bid_line = price_fig.line('x', 'bid_price', source=price_source, line_width=4, color='green', alpha=0.5,
+                              )
+    ask_line = price_fig.line('x', 'ask_price', source=price_source, line_width=4, color='red', alpha=0.5,
+                              )
 
     price_fig.xaxis.formatter = DatetimeTickFormatter(seconds="%H:%M:%S")
+    legend = Legend(items=[
+        ("Mid Price", [mid_line]),
+        ("Bid Price", [bid_line]),
+        ("Ask Price", [ask_line])
+    ], location="center", orientation="horizontal")
+    price_fig.add_layout(legend, 'above')
 
     hist_fig = figure(title="Order Book", width=600, height=300, sizing_mode="stretch_width")
     hist_fig.quad(top='bid_top', bottom=0, left='left', right='right',
