@@ -44,7 +44,7 @@ def main_page(doc):
 
     price_source = ColumnDataSource(data={'x': [], 'y': []})
     order_source = ColumnDataSource(data={'ID': [], 'price': [], 'quantity': [], 'side': []})
-    hist_source = ColumnDataSource(data={'left': [], 'right': [], 'top': []})
+    hist_source = ColumnDataSource(data={'left': [], 'right': [], 'bid_top': [], 'ask_top': []})
 
     # =====================
     # Order Management UI
@@ -100,22 +100,17 @@ def main_page(doc):
         new_orders = {'ID': [], 'price': [], 'quantity': [], 'side': []}
 
         # Iterate over the original orders
-        for order_key, order in user_orders.items():
-            new_orders['ID'].append(int(order['id']))  # Convert 'id' to an integer (if needed)
-            new_orders['price'].append(order['price'])
-            new_orders['quantity'].append(order['quantity'])
-            new_orders['side'].append(order['side'])
+        if user_orders:
+            for order_key, order in user_orders.items():
+                new_orders['ID'].append(int(order['id']))  # Convert 'id' to an integer (if needed)
+                new_orders['price'].append(order['price'])
+                new_orders['quantity'].append(order['quantity'])
+                new_orders['side'].append(order['side'])
 
-        # Update the data source with the new orders
-        order_source.data = new_orders
-
-        # price = np.random.randint(90, 110)
-        # quantity = np.random.randint(1, 10)
-        # side = "buy" if np.random.rand() < 0.5 else "sell"
-        # new_order1 = {'ID': [1], 'price': [price], 'quantity': [quantity], 'side': [side]}
-        # new_order2 = {'ID': [1], 'price': [price], 'quantity': [quantity], 'side': [side]}
-        # order_source.data = new_order1
-        # order_source.stream(new_order2)
+            # Update the data source with the new orders
+            order_source.data = new_orders
+        else:
+            order_source.data = {'ID': [None], 'price': [None], 'quantity': [None], 'side': [None]}
 
 
     def update_price(order_book):
@@ -164,7 +159,7 @@ def main_page(doc):
 
     def delete_order():
         selected = order_source.selected.indices
-        if not selected:
+        if not selected or not order_source.data['ID']:
             return
         order_id = order_source.data['ID'][selected[0]]
         trader.delete_order(order_id, "product1")
@@ -188,7 +183,7 @@ def main_page(doc):
             df = pd.DataFrame()  # Empty DataFrame if both are empty
 
         if df.empty:
-            hist_source.data = {'left': [], 'right': [], 'top': []}
+            hist_source.data = {'left': [], 'right': [], 'bid_top': [], 'ask_top': []}
             return
 
         # Calculate histogram with 10 bins
@@ -209,9 +204,9 @@ def main_page(doc):
             # Find the bin index for the current price
             bin_index = np.digitize(price, bin_edges) - 1
             if 0 <= bin_index < len(bid_bin_heights):
-                if price in bids_df['Price'].values:
+                if 'Price' in bids_df.columns and price in bids_df['Price'].values:
                     bid_bin_heights[bin_index] += quantity  # Bids are added to bid_bin_heights
-                elif price in asks_df['Price'].values:
+                elif 'Price' in asks_df.columns and price in asks_df['Price'].values:
                     ask_bin_heights[bin_index] += quantity  # Asks are added to ask_bin_heights
 
         # Set the histogram data for the plot
