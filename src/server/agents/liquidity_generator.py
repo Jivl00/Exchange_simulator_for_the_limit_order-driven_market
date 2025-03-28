@@ -49,7 +49,7 @@ class SyntheticLiquidityProvider(AdminTrader, ABC):
             if quantity > 0:
                 self.put_order({"side": side, "quantity": quantity, "price": price}, product)
                 logging.info(f"Synthetic liquidity added: {side} order at {price} for {quantity} {product}")
-                print(self.user_balance(product)["current_balance"])
+                # print(self.user_balance(product)["current_balance"])
 
 if __name__ == "__main__":
     config = json.load(open("../config/server_config.json"))

@@ -267,8 +267,7 @@ def make_app():
     viz_port = int(config["VIZ_PORT"])
     server = Server({'/': bokeh_app},
                     io_loop=tornado.ioloop.IOLoop.current(),
-                    allow_websocket_origin=[f"localhost:{viz_port}",
-                                            f"{config['HOST'].replace('http://', '')}:{viz_port}"],
+                    allow_websocket_origin=[f"{config['HOST'].replace('http://', '')}:{viz_port}"],
                     port=viz_port)
     server.start()
 
@@ -276,7 +275,7 @@ def make_app():
 
 if __name__ == "__main__":
     app = make_app()
-    app.listen(config["PORT"])
+    app.listen(0)
     print(f"Website running on {config['HOST']}:{config['VIZ_PORT']}")
     tornado.ioloop.IOLoop.current().start()
 

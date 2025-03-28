@@ -32,7 +32,7 @@ handler.setFormatter(colorlog.ColoredFormatter(
         'CRITICAL': 'bold_red',
     }
 ))
-logging.basicConfig(level=logging.DEBUG, handlers=[handler])
+logging.basicConfig(level=logging.ERROR, handlers=[handler])
 logging.getLogger("tornado.access").disabled = True
 
 config = json.load(open("../config/server_config.json"))
@@ -458,6 +458,6 @@ atexit.register(save_data)
 
 if __name__ == "__main__":
     app = make_app()
-    app.listen(config["PORT"], address=config["HOST"].replace("http://", ""))
+    app.listen(config["PORT"])
     print(f"Server started on {config['HOST']}:{config['PORT']}")
     tornado.ioloop.IOLoop.current().start()

@@ -133,7 +133,7 @@ class Trader (Subscriber, ABC):
         data = {"budget": budget, "msg_type": "RegisterRequest"}
         message = self.PROTOCOL.encode(data)
         response = requests.post(f"{self.BASE_URL}/{self.TRADING_SESSION}",
-                                 json={"message": message, "msg_type": data["msg_type"]})
+                                 json={"message": message.decode("utf-8"), "msg_type": data["msg_type"]})
         response = self.parse_response(response)
         if response is None:
             return None
@@ -155,7 +155,7 @@ class Trader (Subscriber, ABC):
         message = self.PROTOCOL.encode(data)
 
         response = requests.get(f"{self.BASE_URL}/{self.QUOTE_SESSION}",
-                                json={"message": message, "msg_type": data["msg_type"]})
+                                json={"message": message.decode("utf-8"), "msg_type": data["msg_type"]})
         response = self.parse_response(response)
         if response is None:
             return None
@@ -174,7 +174,7 @@ class Trader (Subscriber, ABC):
         message = self.PROTOCOL.encode(data)
 
         response = requests.post(f"{self.BASE_URL}/{self.TRADING_SESSION}",
-                                 json={"message": message, "msg_type": data["msg_type"]})
+                                 json={"message": message.decode("utf-8"), "msg_type": data["msg_type"]})
         response = self.parse_response(response)
         if response is None:
             return None, False
@@ -197,7 +197,7 @@ class Trader (Subscriber, ABC):
         message = self.PROTOCOL.encode(data)
 
         response = requests.post(f"{self.BASE_URL}/{self.TRADING_SESSION}",
-                                 json={"message": message, "msg_type": data["msg_type"]})
+                                 json={"message": message.decode("utf-8"), "msg_type": data["msg_type"]})
         response = self.parse_response(response)
         if response is None:
             return None
@@ -216,7 +216,7 @@ class Trader (Subscriber, ABC):
         data = {"ID": ID, "quantity": quantity, "product": product, "msg_type": "OrderModifyRequestQty"}
         message = self.PROTOCOL.encode(data)
         response = requests.post(f"{self.BASE_URL}/{self.TRADING_SESSION}",
-                                 json={"message": message, "msg_type": data["msg_type"]})
+                                 json={"message": message.decode("utf-8"), "msg_type": data["msg_type"]})
         response = self.parse_response(response)
         if response is None:
             return None
@@ -254,7 +254,7 @@ class Trader (Subscriber, ABC):
         data = {"depth": depth, "product": product, "msg_type": "MarketDataRequest"}
         message = self.PROTOCOL.encode(data)
         response = requests.get(f"{self.BASE_URL}/{self.QUOTE_SESSION}",
-                                json={"message": message, "msg_type": data["msg_type"]})
+                                json={"message": message.decode("utf-8"), "msg_type": data["msg_type"]})
         response = self.parse_response(response)
         if response is None:
             return None
@@ -273,7 +273,7 @@ class Trader (Subscriber, ABC):
         data = {"product": product, "msg_type": "UserOrderStatusRequest"}
         message = self.PROTOCOL.encode(data)
         response = requests.get(f"{self.BASE_URL}/{self.QUOTE_SESSION}",
-                                json={"message": message, "msg_type": data["msg_type"]})
+                                json={"message": message.decode("utf-8"), "msg_type": data["msg_type"]})
         response = self.parse_response(response)
         if response is None:
             return None
@@ -293,7 +293,7 @@ class Trader (Subscriber, ABC):
         data = {"product": product, "msg_type": "UserBalanceRequest"}
         message = self.PROTOCOL.encode(data)
         response = requests.get(f"{self.BASE_URL}/{self.QUOTE_SESSION}",
-                                json={"message": message, "msg_type": data["msg_type"]})
+                                json={"message": message.decode("utf-8"), "msg_type": data["msg_type"]})
         response = self.parse_response(response)
         if response is None:
             return None
@@ -314,7 +314,7 @@ class Trader (Subscriber, ABC):
         data = {"product": product, "history_len": history_length, "msg_type": "CaptureReportRequest"}
         message = self.PROTOCOL.encode(data)
         response = requests.get(f"{self.BASE_URL}/{self.QUOTE_SESSION}",
-                                json={"message": message, "msg_type": data["msg_type"]})
+                                json={"message": message.decode("utf-8"), "msg_type": data["msg_type"]})
         response = self.parse_response(response)
         if response is None:
             return []
@@ -460,7 +460,7 @@ class AdminTrader(Trader, ABC):
         data = {"budget": budget, "volume": volume, "msg_type": "InitializeLiquidityEngine"}
         message = self.PROTOCOL.encode(data)
         response = requests.post(f"{self.BASE_URL}/{self.TRADING_SESSION}",
-                                 json={"message": message, "msg_type": data["msg_type"]})
+                                 json={"message": message.decode("utf-8"), "msg_type": data["msg_type"]})
         response = self.parse_response(response)
         if response is None:
             return None
