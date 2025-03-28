@@ -1,7 +1,7 @@
 {
     "PORT": 8888,
-    "VIZ_PORT": 8887,
-    "HOST": "http://127.0.0.1",
+    "VIZ_PORT": 8080,
+    "HOST": "http://78.128.235.249",
     "TRADING_SESSION": "trade",
     "QUOTE_SESSION": "quote"
 }
