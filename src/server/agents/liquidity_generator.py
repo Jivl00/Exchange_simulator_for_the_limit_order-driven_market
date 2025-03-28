@@ -3,6 +3,9 @@ import random
 import time
 from abc import ABC
 import json
+import os
+import sys
+sys.path.append(os.path.join(os.path.dirname(__file__), '../../..'))
 
 from src.client.client import AdminTrader
 from src.server.server import products
