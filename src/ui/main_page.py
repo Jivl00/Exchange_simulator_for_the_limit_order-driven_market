@@ -7,6 +7,7 @@ import tornado
 import os
 import sys
 sys.path.append(os.path.join(os.path.dirname(__file__), '../..'))
+sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 from bokeh.server.server import Server
 from bokeh.application import Application as BkApplication
 from bokeh.application.handlers.function import FunctionHandler
