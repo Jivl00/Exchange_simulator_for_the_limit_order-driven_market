@@ -460,7 +460,8 @@ def main_page(doc):
         if not asks_df.empty:
             asks_df = asks_df.groupby('Price', as_index=False).agg(
                 {'Quantity': 'sum', 'ID': 'count', 'User': 'first'})
-            asks_df = asks_df.sort_values('Price', ascending=False).head(10)  # Get top 10 asks
+            asks_df = asks_df.sort_values('Price', ascending=True).head(10)  # Get top 10 asks
+            asks_df = asks_df.iloc[::-1]
             hist_ask_table_source.data = {
                 'ask_price': np.array(asks_df['Price']).astype(str),
                 'ask_quantity': asks_df['Quantity'],
