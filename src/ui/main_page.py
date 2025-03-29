@@ -7,7 +7,6 @@ import datetime
 import tornado
 import os
 import sys
-
 sys.path.append(os.path.join(os.path.dirname(__file__), '../..'))
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 from bokeh.server.server import Server
@@ -38,8 +37,6 @@ value_style = f"{common_style} color: rgba(0, 0, 0, 1);"
 # Bokeh App Initialization
 # =====================
 def main_page(doc):
-    # doc.theme = built_in_themes['dark_minimal']
-
     # Reinitialize models to ensure they are unique per session
     initial_balance = 10000
     trader = WebTrader("bokeh", "server", config)
@@ -242,14 +239,14 @@ def main_page(doc):
 
         balance_text.text = f"""
                             <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
-                                <span style="{label_style}">Balance:</span>
+                                <span style="{label_style}">Remaining Balance:</span>
                                 <span style="{value_style}">${local_balance:.2f}</span>
                             </div>
         
                             """
         quantity_text.text = f"""
                             <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
-                                <span style="{label_style}">Quantity:</span>
+                                <span style="{label_style}">Owned Quantity:</span>
                                 <span style="{value_style}">{local_quantity}</span>
                             </div>
                             """
