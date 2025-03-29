@@ -5,6 +5,9 @@ from abc import ABC
 import json
 import os
 import sys
+
+import numpy as np
+
 sys.path.append(os.path.join(os.path.dirname(__file__), '../../..'))
 
 from src.client.client import AdminTrader
@@ -30,7 +33,9 @@ class SyntheticLiquidityProvider(AdminTrader, ABC):
             product = random.choice(products) # randomly select a product to trade
             product = "product1" # TODO: Remove this line
             order_book = self.get_top_of_the_book(product) # get top of the order book
-            side = random.choice(["buy", "sell"]) # randomly select a side
+            bid_volume = sum([order["Quantity"] for order in order_book["Bids"]])
+            ask_volume = sum([order["Quantity"] for order in order_book["Asks"]])
+            side = np.random.choice(["sell", "buy"], p=[bid_volume / (bid_volume + ask_volume), ask_volume / (bid_volume + ask_volume)])
             # randomly select a price
             if side == "buy":
                 if order_book["Bids"]:
