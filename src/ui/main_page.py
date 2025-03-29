@@ -1,7 +1,6 @@
 import json
 import logging
 
-import bokeh
 import numpy as np
 import pandas as pd
 import datetime
@@ -20,7 +19,7 @@ from bokeh.models import Legend
 from bokeh.layouts import column, row
 from bokeh.models import (
     ColumnDataSource, DataTable, TableColumn, Button, TextInput,
-    RadioButtonGroup, Div, HoverTool, LegendItem
+    RadioButtonGroup, Div, HoverTool, LegendItem, GroupBox
 )
 from ui.web_trader import WebTrader
 
@@ -31,7 +30,9 @@ config = json.load(open("../config/server_config.json"))
 # =====================
 # Backend Variables
 # =====================
-
+common_style = "font-family: 'Arial', sans-serif; font-size: 12px;"
+label_style = f"{common_style} color: rgba(0, 0, 0, 0.5);"
+value_style = f"{common_style} color: rgba(0, 0, 0, 1);"
 
 # =====================
 # Bokeh App Initialization
@@ -45,32 +46,26 @@ def main_page(doc):
     trader.register(initial_balance)
 
     # Top screen info
-    product_info = Div(text="<h1>Product: product1</h1>", width=300)
+    product_info = Div(text="<h1 style='opacity: 0.5;'>StackUnderflow Stocks</h1>", width=300)
     info_table = column(
-            Div(text=f""),
-            sizing_mode="stretch_both"
-            )
-        
-
-    # Bottom table info
-    change_today_text = Div(text="<h3>Change Today: 0.0%</h3>", width=300)
-    imbalance_index_text = Div(text="<h3>Imbalance Index: 0.0</h3>", width=300)
-    minimum_order_size_text = Div(text="<h3>Order Size Granularity: 1</h3>", width=300)
-    minimum_order_price_text = Div(text="<h3>Order Price Granularity: 0.01</h3>", width=300)
-    trading_fee_text = Div(text="<h3>Trading Fee: 0.1%</h3>", width=300)
+        Div(text=f""),
+        sizing_mode="stretch_both"
+    )
 
     # Trader dynamic text
-    balance_text = Div(text=f"<h3>Balance: ${initial_balance:.2f}</h3>", width=300)
-    volume_text = Div(text=f"<h3>Volume: {0} lots</h3>", width=300)
+    balance_text = Div(text=f"", width=300)
+    quantity_text = Div(text=f"", width=300)
+    fee_text = Div(text=f"", width=300)
 
     price_source = ColumnDataSource(data={'x': [], 'bid_price': [], 'ask_price': []})
     order_source = ColumnDataSource(data={'ID': [], 'price': [], 'quantity': [], 'side': []})
     hist_source = ColumnDataSource(data={'left': [], 'right': [], 'bid_top': [], 'ask_top': []})
+    mid_price_source = ColumnDataSource(data={'x': [], 'y': []})
     hist_bid_table_source = ColumnDataSource(
-        data={'bid_price': [], 'bid_volume': [], 'int_bid_price': [], 'price_label': [],
-              'price_pos': [], 'volume_label': [], 'volume_pos': []})
+        data={'bid_price': [], 'bid_quantity': [], 'int_bid_price': [], 'price_label': [],
+              'price_pos': [], 'quantity_label': [], 'quantity_pos': []})
     hist_ask_table_source = ColumnDataSource(
-        data={'ask_price': [], 'ask_volume': [], 'int_ask_price': [], 'price_pos': [], 'volume_pos': []})
+        data={'ask_price': [], 'ask_quantity': [], 'int_ask_price': [], 'price_pos': [], 'quantity_pos': []})
 
     # =====================
     # Order Management UI
@@ -87,7 +82,7 @@ def main_page(doc):
         TableColumn(field="quantity", title="Quantity"),
         TableColumn(field="side", title="Side"),
     ]
-    order_table = DataTable(source=order_source, columns=columns, width=400, height=250)
+    order_table = DataTable(source=order_source, columns=columns, width=365, height=250)
 
     # =====================
     # Graphs
@@ -96,11 +91,12 @@ def main_page(doc):
     # --------------------------------
     price_fig = figure(
         width=600,
-        frame_height=300,
+        frame_height=250,
         sizing_mode="stretch_width",
         x_axis_type="datetime",
         toolbar_location="right",
         tools="pan,box_zoom,wheel_zoom,reset",
+        outline_line_color=None
     )
     price_fig.toolbar.logo = None
 
@@ -111,20 +107,26 @@ def main_page(doc):
     legend = Legend(items=[
         ("Best Bid Price", [bid_line]),
         ("Best Ask Price", [ask_line])
-    ], location="left", orientation="horizontal")
+    ], location="left", orientation="horizontal", click_policy="hide", spacing=20)
     price_fig.add_layout(legend, 'above')
     # Add separate hover tools for each line
     bid_hover = HoverTool(renderers=[bid_line], tooltips=[
         ("Time", "@x{%F %T}"),
-        ("Bid Price", "@bid_price")
+        ("Bid Price", "@bid_price{0.00}")
     ], formatters={'@x': 'datetime'}, mode='mouse', visible=False)
 
     ask_hover = HoverTool(renderers=[ask_line], tooltips=[
         ("Time", "@x{%F %T}"),
-        ("Ask Price", "@ask_price")
+        ("Ask Price", "@ask_price{0.00}")
     ], formatters={'@x': 'datetime'}, mode='mouse', visible=False)
 
     price_fig.add_tools(bid_hover, ask_hover)
+
+    price_fig_group = GroupBox(
+        child=price_fig,
+        title="Price Chart",
+        sizing_mode="stretch_width",
+    )
 
     # Order Book chart
     # --------------------------------
@@ -136,66 +138,86 @@ def main_page(doc):
         tools="pan,box_zoom,wheel_zoom,reset",
     )
     hist_fig.toolbar.logo = None
-    hist_fig.quad(top='bid_top', bottom=0, left='left', right='right',
-                  color='green', alpha=0.5, source=hist_source)
-    hist_fig.quad(top='ask_top', bottom=0, left='left', right='right',
-                  color='red', alpha=0.5, source=hist_source)
+    bid_renderer = hist_fig.quad(top='bid_top', bottom=0, left='left', right='right',
+                                 color='green', alpha=0.5, source=hist_source)
+    ask_renderer = hist_fig.quad(top='ask_top', bottom=0, left='left', right='right',
+                                 color='red', alpha=0.5, source=hist_source)
+    mid_price_line = hist_fig.line('x', 'y', source=mid_price_source, line_width=2, color='blue', alpha=0.5,
+                                   line_dash='dashed')
     legend = Legend(items=[
-        LegendItem(label="Order Book - ", renderers=[]),
         LegendItem(label="Bids", renderers=[hist_fig.renderers[0]]),
-        LegendItem(label="Asks", renderers=[hist_fig.renderers[1]])
-    ], location="top_left", orientation="horizontal")
+        LegendItem(label="Asks", renderers=[hist_fig.renderers[1]]),
+        LegendItem(label="Mid Price", renderers=[mid_price_line])
+    ], location="top_left", orientation="horizontal", click_policy="hide", spacing=20)
     hist_fig.add_layout(legend, 'above')
     hist_fig.xaxis.axis_label = "Price"
-    hist_fig.yaxis.axis_label = "Volume"
-    # Add hover tool to show price and volume
-    hover = HoverTool(tooltips=[
-        ("Price", "@left"),
-        ("Volume BID", "@{bid_top}" if hist_source.data['bid_top'] != 0 else ""),
-        ("Volume ASK", "@{ask_top}{safe}" if hist_source.data['ask_top'] != 0 else "")
-        ],
-        mode='mouse', visible=False)
-    hist_fig.add_tools(hover)
+    hist_fig.yaxis.axis_label = "Quantity"
+    # Add hover tool to show price and quantity
+    bid_hover = HoverTool(renderers=[bid_renderer], tooltips=[
+        ("Price", "@left{0.00}"),
+        ("Quantity", "@bid_top")
+    ], mode='mouse', visible=False)
+    ask_hover = HoverTool(renderers=[ask_renderer], tooltips=[
+        ("Price", "@left{0.00}"),
+        ("Quantity", "@ask_top")
+    ], mode='mouse', visible=False)
+    mid_price_hover = HoverTool(renderers=[mid_price_line], tooltips=[
+        ("Mid Price", "@x{0.00}")
+    ], mode='mouse', visible=False)
+    hist_fig.add_tools(bid_hover, ask_hover, mid_price_hover)
 
+    hist_fig_group = GroupBox(
+        child=hist_fig,
+        title="Order Book",
+        sizing_mode="stretch_width",
+    )
 
     # Order Book table
     # --------------------------------
-    bid_book_fig = figure(title="Active orders", height=250, width=800, toolbar_location=None, tools="")
+    bid_book_fig = figure(height=250, width=300, toolbar_location=None, tools="")
     bid_book_fig.axis.visible = False
     bid_book_fig.grid.visible = False
     bid_book_fig.toolbar.logo = None
 
-    ask_book_fig = figure(height=230, width=800, toolbar_location=None, tools="")
+    ask_book_fig = figure(height=230, width=300, toolbar_location=None, tools="")
     ask_book_fig.axis.visible = False
     ask_book_fig.grid.visible = False
     ask_book_fig.toolbar.logo = None
 
-    bid_book_fig.hbar(y='int_bid_price', right='bid_volume', height=0.8, source=hist_bid_table_source,
-                      color="forestgreen", alpha=0.3)
-    ask_book_fig.hbar(y='int_ask_price', right='ask_volume', height=0.8, source=hist_ask_table_source, color="salmon",
-                      alpha=0.3)
-    # Add price column to the left of the bid volume
+    bid_book_fig.hbar(y='int_bid_price', right='bid_quantity', height=0.8, source=hist_bid_table_source,
+    color = "forestgreen", alpha = 0.3)
+    ask_book_fig.hbar(y='int_ask_price', right='ask_quantity', height=0.8, source=hist_ask_table_source, color="salmon",
+    alpha = 0.3)
+    # Add price column to the left of the bid quantity
     bid_book_fig.text(x='price_pos', y='int_bid_price',
-                      text='bid_price', text_font_size="10pt", text_align="left",
-                      text_baseline="middle", color="forestgreen", source=hist_bid_table_source)
+    text = 'bid_price', text_font_size = "10pt", text_align = "left",
+    text_baseline = "middle", color = "forestgreen", source = hist_bid_table_source)
     bid_book_fig.text(x='price_pos', y='int_bid_price',
-                      text='price_label', text_font_size="10pt", text_align="left",
-                      text_baseline="middle", color="black", source=hist_bid_table_source)
-    # Add volume column to the right of the bid volume
-    bid_book_fig.text(x='volume_pos', y='int_bid_price',
-                      text='bid_volume', text_font_size="10pt", text_align="left",
-                      text_baseline="middle", color="forestgreen", source=hist_bid_table_source)
-    bid_book_fig.text(x='volume_pos', y='int_bid_price',
-                      text='volume_label', text_font_size="10pt", text_align="left",
-                      text_baseline="middle", color="black", source=hist_bid_table_source)
-    # Add price column to the left of the ask volume
+    text = 'price_label', text_font_size = "10pt", text_align = "left",
+    text_baseline = "middle", color = "black", source = hist_bid_table_source)
+    # Add quantity column to the right of the bid quantity
+    bid_book_fig.text(x='quantity_pos', y='int_bid_price',
+    text = 'bid_quantity', text_font_size = "10pt", text_align = "left",
+    text_baseline = "middle", color = "forestgreen", source = hist_bid_table_source)
+    bid_book_fig.text(x='quantity_pos', y='int_bid_price',
+    text = 'quantity_label', text_font_size = "10pt", text_align = "left",
+    text_baseline = "middle", color = "black", source = hist_bid_table_source)
+    # Add price column to the left of the ask quantity
     ask_book_fig.text(x='price_pos', y='int_ask_price',
-                      text='ask_price', text_font_size="10pt", text_align="left",
-                      text_baseline="middle", color="red", source=hist_ask_table_source)
-    # Add volume column to the right of the ask volume
-    ask_book_fig.text(x='volume_pos', y='int_ask_price',
-                      text='ask_volume', text_font_size="10pt", text_align="left",
-                      text_baseline="middle", color="red", source=hist_ask_table_source)
+    text = 'ask_price', text_font_size = "10pt", text_align = "left",
+    text_baseline = "middle", color = "red", source = hist_ask_table_source)
+    # Add quantity column to the right of the ask quantity
+    ask_book_fig.text(x='quantity_pos', y='int_ask_price',
+    text = 'ask_quantity', text_font_size = "10pt", text_align = "left",
+    text_baseline = "middle", color = "red", source = hist_ask_table_source)
+
+    table_book_group = GroupBox(
+        child=column(bid_book_fig, ask_book_fig),
+        title="Active orders",
+        width=320,
+        height=480,
+        sizing_mode="fixed",
+    )
 
     # =====================
     # Callbacks
@@ -207,10 +229,37 @@ def main_page(doc):
         mid_price, imbalance = update_price(order_book)
         user_data = trader.user_balance("product1", verbose=False)
         local_balance = user_data["post_buy_budget"]
-        local_volume = user_data["current_balance"]["post_sell_volume"]
+        local_quantity = user_data["current_balance"]["post_sell_volume"]
 
-        balance_text.text = f"<h3>Balance: ${local_balance:.2f}</h3>"
-        volume_text.text = f"<h3>Volume: {local_volume} lots</h3>"
+        balance_text.text = f"""
+                            <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+                                <span style="{label_style}">Balance:</span>
+                                <span style="{value_style}">${local_balance:.2f}</span>
+                            </div>
+        
+                            """
+        quantity_text.text = f"""
+                            <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+                                <span style="{label_style}">Quantity:</span>
+                                <span style="{value_style}">{local_quantity}</span>
+                            </div>
+                            """
+        fee_text.text = f"""
+            <div style="display: flex; flex-direction: column; gap: 3px; padding: 5px; border: 1px solid #ccc; border-radius: 5px; background-color: #f9f9f9;">
+                <div style="display: flex; justify-content: space-between;">
+                    <span style="{label_style}; font-weight: bold;">Trading Fee:</span>
+                    <span style="{value_style}; color: #d9534f; font-weight: bold;">0.01</span>
+                </div>
+                <div style="display: flex; justify-content: space-between;">
+                    <span style="{label_style};">+ Percentage of Price:</span>
+                    <span style="{value_style}; color: #d9534f;">0.1%</span>
+                </div>
+                <div style="display: flex; justify-content: space-between;">
+                    <span style="{label_style};">+ Percentage of quantity:</span>
+                    <span style="{value_style}; color: #d9534f;">0.5%</span>
+                </div>
+            </div>
+        """
 
         user_orders = trader.list_user_orders("product1")
         new_orders = {'ID': [], 'price': [], 'quantity': [], 'side': []}
@@ -232,47 +281,30 @@ def main_page(doc):
         change_today = round(((mid_price - start_of_day_price) / start_of_day_price) * 100, 2)
         change_today_color = "green" if change_today >= 0 else "red"
         change_today = f'<span style="color: {change_today_color};">{change_today}%</span>'
-        imbalance_index = str(round(imbalance, 2))
-        order_size_granularity = "1"
-        order_price_granularity = "0.01"
-        trading_fee = "0.01 + 0.1% of price + 0.5% of volume"
 
+        data = {
+            "Change Today": change_today,
+            "Imbalance Index": str(round(imbalance, 2)),
+            "Order Size Granularity": "1",
+            "Order Price Granularity": "0.01",
+        }
 
         # Updated info_table with title and dynamic values
         nonlocal info_table
         info_table.children[0].text = f"""
             <div style="border: 1.6px solid rgba(0, 0, 0, 0.1); padding: 10px; width: 290px;">
-                <h2 style="font-family: 'Arial', sans-serif; font-size: 13px; color: rgba(0, 0, 0, 0.65); margin: 0 0 10px 0;">
-                    Trading Details
-                </h2>
-                <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
-                    <span style="font-family: 'Arial', sans-serif; font-size: 12px; color: rgba(0, 0, 0, 0.5);">Change Today:</span>
-                    <span style="font-family: 'Arial', sans-serif; font-size: 12px; color: rgba(0, 0, 0, 1);">{change_today}</span>
-                </div>
-                <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
-                    <span style="font-family: 'Arial', sans-serif; font-size: 12px; color: rgba(0, 0, 0, 0.5);">Imbalance Index:</span>
-                    <span style="font-family: 'Arial', sans-serif; font-size: 12px; color: rgba(0, 0, 0, 1);">{imbalance_index}</span>
-                </div>
-                <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
-                    <span style="font-family: 'Arial', sans-serif; font-size: 12px; color: rgba(0, 0, 0, 0.5);">Order Size Granularity:</span>
-                    <span style="font-family: 'Arial', sans-serif; font-size: 12px; color: rgba(0, 0, 0, 1);">{order_size_granularity}</span>
-                </div>
-                <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
-                    <span style="font-family: 'Arial', sans-serif; font-size: 12px; color: rgba(0, 0, 0, 0.5);">Order Price Granularity:</span>
-                    <span style="font-family: 'Arial', sans-serif; font-size: 12px; color: rgba(0, 0, 0, 1);">{order_price_granularity}</span>
-                </div>
-                <div style="display: flex; justify-content: space-between;">
-                    <span style="font-family: 'Arial', sans-serif; font-size: 12px; color: rgba(0, 0, 0, 0.5);">Trading Fee:</span>
-                    <span style="font-family: 'Arial', sans-serif; font-size: 12px; color: rgba(0, 0, 0, 1);">{trading_fee}</span>
-                </div>
+                {''.join(f'<div style="display: flex; justify-content: space-between; margin-bottom: 5px;">'
+                         f'<span style="{label_style}">{key}:</span>'
+                         f'<span style="{value_style}">{value}</span>'
+                         '</div>' for key, value in data.items())}
             </div>
-            """
+        """
 
     def calculate_imbalance_index(asks, bids, alpha=0.5, level=3):
         """
         Calculate imbalance index for a given orderbook.
-        :param asks: list of ask sizes (volumes)
-        :param bids: list of bid sizes (volumes)
+        :param asks: list of ask sizes (quantitys)
+        :param bids: list of bid sizes (quantitys)
         :param alpha: parameter for imbalance index
         :param level: number of levels to consider
         :return: imbalance index
@@ -305,6 +337,7 @@ def main_page(doc):
                 {'Quantity': 'sum', 'ID': 'count', 'User': 'first'})
             imbalance = calculate_imbalance_index(asks_df['Quantity'].values, bids_df['Quantity'].values)
             mid_price = (bids[0]["Price"] + asks[0]["Price"]) / 2
+            mid_price_source.data['x'] = [mid_price, mid_price]
 
             new_data = {
                 'x': [time],
@@ -381,12 +414,15 @@ def main_page(doc):
                     ask_bin_heights[bin_index] += quantity  # Asks are added to ask_bin_heights
 
         # Set the histogram data for the plot
+        mid_price_source.data['y'] = [0, max(bid_bin_heights.max(), ask_bin_heights.max())]
         hist_source.data = {
             'left': bin_edges[:-1],  # Left edge of each bin
             'right': bin_edges[1:],  # Right edge of each bin
             'bid_top': bid_bin_heights,  # Cumulative bid quantity for each bin
             'ask_top': ask_bin_heights,  # Cumulative ask quantity for each bin
         }
+
+
 
     def update_histogram_table(order_book):
         bids_df = pd.DataFrame(order_book.get('Bids', []))
@@ -398,16 +434,16 @@ def main_page(doc):
             bids_df = bids_df.sort_values('Price', ascending=False).head(10)  # Get top 10 bids
             hist_bid_table_source.data = {
                 'bid_price': np.array(bids_df['Price']).astype(str).tolist() + [""],
-                'bid_volume': bids_df['Quantity'].to_numpy().tolist() + [""],
+                'bid_quantity': bids_df['Quantity'].to_numpy().tolist() + [""],
                 'int_bid_price': [i for i in range(1, len(bids_df) + 2)],  # + 2 because of the extra row
                 "price_label": [""] * (len(bids_df)) + ["Price"],
                 "price_pos": [bids_df["Quantity"].max() * 0.1] * (len(bids_df) + 1),
-                "volume_label": [""] * (len(bids_df)) + ["Volume"],
-                "volume_pos": [bids_df["Quantity"].max() * 0.5] * (len(bids_df) + 1)
+                "quantity_label": [""] * (len(bids_df)) + ["Quantity"],
+                "quantity_pos": [bids_df["Quantity"].max() * 0.5] * (len(bids_df) + 1)
             }
         else:
-            hist_bid_table_source.data = {'bid_price': [], 'bid_volume': [], 'int_bid_price': [], 'price_label': [],
-                                          'price_pos': [], 'volume_label': [], 'volume_pos': []}
+            hist_bid_table_source.data = {'bid_price': [], 'bid_quantity': [], 'int_bid_price': [], 'price_label': [],
+                                          'price_pos': [], 'quantity_label': [], 'quantity_pos': []}
 
         if not asks_df.empty:
             asks_df = asks_df.groupby('Price', as_index=False).agg(
@@ -415,30 +451,48 @@ def main_page(doc):
             asks_df = asks_df.sort_values('Price', ascending=False).head(10)  # Get top 10 asks
             hist_ask_table_source.data = {
                 'ask_price': np.array(asks_df['Price']).astype(str),
-                'ask_volume': asks_df['Quantity'],
+                'ask_quantity': asks_df['Quantity'],
                 'int_ask_price': [i for i in range(1, len(asks_df) + 1)],
                 "price_pos": [asks_df["Quantity"].max() * 0.1] * len(asks_df),
-                "volume_pos": [asks_df["Quantity"].max() * 0.5] * len(asks_df)
+                "quantity_pos": [asks_df["Quantity"].max() * 0.5] * len(asks_df)
             }
         else:
-            hist_ask_table_source.data = {'ask_price': [], 'ask_volume': [], 'int_ask_price': [], 'price_pos': [],
-                                          'volume_pos': []}
+            hist_ask_table_source.data = {'ask_price': [], 'ask_quantity': [], 'int_ask_price': [], 'price_pos': [],
+                                          'quantity_pos': []}
 
     send_button.on_click(send_order)
     delete_button.on_click(delete_order)
 
     # Layouts
     info_top_row = row(product_info, sizing_mode="stretch_width")
-    controls = column(
-        Div(text="<h2>Trading Panel</h2>"),
-        balance_text, volume_text,
-        price_input, quantity_input, side_selector, send_button,
-        Div(text="<h3>Active orders</h3>"),
-        order_table, delete_button, width=400, sizing_mode="stretch_both"
+    new_order_group = GroupBox(
+        child=column(balance_text, quantity_text,fee_text, price_input, quantity_input, side_selector, send_button),
+        title="New Order",
+        sizing_mode="stretch_width",
     )
-    table = column(info_top_row, bid_book_fig, ask_book_fig, info_table, width=300, sizing_mode="stretch_height")
-    graphs = column(price_fig, hist_fig, width=750, sizing_mode="fixed")
-    layout = row(table, graphs, controls, sizing_mode="stretch_both")
+    user_orders_group = GroupBox(
+        child=column(order_table, delete_button),
+        title="Active User Orders",
+    )
+    controls = column(
+        new_order_group,
+        user_orders_group, width=400, sizing_mode="stretch_height",
+    )
+    control_box = GroupBox(
+        child=controls,
+        title="Trading Panel",
+        sizing_mode="stretch_height",
+    )
+    info_table_group = GroupBox(
+        child=info_table,
+        title="Trading Details",
+        sizing_mode="stretch_height",
+        margin=(40, 0, 0, 0),
+    )
+
+    table = column(info_top_row, table_book_group, info_table_group, width=325, sizing_mode="stretch_height")
+    graphs = column(price_fig_group, hist_fig_group, width=750, sizing_mode="fixed")
+    layout = row(table, graphs, control_box, sizing_mode="stretch_both")
 
     # Add to document
     doc.add_root(layout)
