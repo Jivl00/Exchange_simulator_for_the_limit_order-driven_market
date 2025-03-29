@@ -1,5 +1,7 @@
 import json
 import logging
+
+import bokeh
 import numpy as np
 import pandas as pd
 import datetime
@@ -38,7 +40,7 @@ def main_page(doc):
     # doc.theme = built_in_themes['dark_minimal']
 
     # Reinitialize models to ensure they are unique per session
-    initial_balance = 1000
+    initial_balance = 10000
     trader = WebTrader("bokeh", "server", config)
     trader.register(initial_balance)
 
@@ -49,7 +51,7 @@ def main_page(doc):
     change_today_text = Div(text="<h3>Change Today: 0.0%</h3>", width=300)
     imbalance_index_text = Div(text="<h3>Imbalance Index: 0.0</h3>", width=300)
     minimum_order_size_text = Div(text="<h3>Order Size Granularity: 1</h3>", width=300)
-    minimium_order_price_text = Div(text="<h3>Order Price Granularity: 0.01</h3>", width=300)
+    minimum_order_price_text = Div(text="<h3>Order Price Granularity: 0.01</h3>", width=300)
     trading_fee_text = Div(text="<h3>Trading Fee: 0.1%</h3>", width=300)
 
     # Trader dynamic text
@@ -82,9 +84,11 @@ def main_page(doc):
     # =====================
     # Graphs
     # =====================
+    # Price chart
+    # --------------------------------
     price_fig = figure(
         width=600,
-        frame_height=350,
+        frame_height=300,
         sizing_mode="stretch_width",
         x_axis_type="datetime",
         toolbar_location="right",
@@ -113,6 +117,8 @@ def main_page(doc):
 
     price_fig.add_tools(bid_hover, ask_hover)
 
+    # Order Book chart
+    # --------------------------------
     hist_fig = figure(title="Order Book", width=600, height=300, sizing_mode="stretch_width", toolbar_location="right")
     hist_fig.toolbar.logo = None
     hist_fig.quad(top='bid_top', bottom=0, left='left', right='right',
@@ -126,47 +132,18 @@ def main_page(doc):
         ("Asks", [hist_fig.renderers[-1]])  # Asks are the last plot
     ]
 
-    data = {
-        'price': [95.57, 95.49, 95.48, 95.41, 94.82],
-        'volume': [40, 37, 61, 45, 75],
-    }
-    # Create a pandas DataFrame
-    df = pd.DataFrame(data)
 
-    # Create ColumnDataSource
-    source = ColumnDataSource(df)
-    source.data = data
+    # Order Book table
+    # --------------------------------
+    bid_book_fig = figure(title="Active orders", height=250, width=800, toolbar_location=None)
+    bid_book_fig.axis.visible = False
+    bid_book_fig.grid.visible = False
+    bid_book_fig.toolbar.logo = None
 
-
-
-    # Create the figure
-    p = figure(title="Active orders", x_axis_label='Volume', y_axis_label='Price',
-               height=400, width=800, toolbar_location=None, sizing_mode="stretch_width")
-    p.axis.visible = False
-    p.grid.visible = False
-    p.toolbar.logo = None
-
-    # Add horizontal bars (hbars) to represent volume at each price level
-    p.hbar(y='int_bid_price', right='bid_volume', height=0.8, source=hist_bid_table_source, color="skyblue", alpha=0.6)
-    # p.hbar(y='price', right='volume', height=0.8, source=source, color="skyblue", alpha=0.6)
-
-    # text1 = p.text(x=10, y='int_bid_price',
-    #        text='bid_price', text_font_size="10pt", text_align="left",
-    #        text_baseline="middle", color="black", source=hist_bid_table_source)
-    #
-    # text2 = p.text(x=50, y='int_bid_price',
-    #        text='bid_volume', text_font_size="10pt", text_align="left",
-    #        text_baseline="middle", color="black", source=hist_bid_table_source)
-
-    # p.text(x=200, y=source.data['price'],
-    #        text=source.data['volume'].astype(str), text_font_size="10pt", text_align="right",
-    #        text_baseline="middle", color="black")
-
-    # p.text(x=10, y=max(df['price']) + 1, text=["Price"], text_font_size="10pt", text_align="center",
-    #        text_baseline="bottom", color="black")
-    #
-    # p.text(x=200, y=max(df['price']) + 1, text=["Volume"], text_font_size="10pt",
-    #        text_align="center", text_baseline="bottom", color="black")
+    ask_book_fig = figure(height=230, width=800, toolbar_location=None)
+    ask_book_fig.axis.visible = False
+    ask_book_fig.grid.visible = False
+    ask_book_fig.toolbar.logo = None
 
     # =====================
     # Callbacks
@@ -315,38 +292,68 @@ def main_page(doc):
         bids_df = pd.DataFrame(order_book.get('Bids', []))
         asks_df = pd.DataFrame(order_book.get('Asks', []))
 
+        hist_bid_table_source.data = {'bid_price': [], 'bid_volume': [], 'int_bid_price': []}
+        hist_ask_table_source.data = {'ask_price': [], 'ask_volume': [], 'int_ask_price': []}
+
         if not bids_df.empty:
             bids_df = bids_df.groupby('Price', as_index=False).agg(
                 {'Quantity': 'sum', 'ID': 'count', 'User': 'first'})
+            bids_df = bids_df.sort_values('Price', ascending=False).head(10) # Get top 10 bids
+            hist_bid_table_source.data = {
+                'bid_price':  np.array(bids_df['Price']).astype(str),
+                'bid_volume': bids_df['Quantity'],
+                'int_bid_price': [i for i in range(1, len(bids_df) + 1)]
+            }
+
         if not asks_df.empty:
             asks_df = asks_df.groupby('Price', as_index=False).agg(
                 {'Quantity': 'sum', 'ID': 'count', 'User': 'first'})
-        # Trim to top 10 bids and asks
-        bids_df = bids_df.sort_values('Price', ascending=False).head(10)
-        asks_df = asks_df.sort_values('Price', ascending=True).head(10)
+            asks_df = asks_df.sort_values('Price', ascending=False).head(10) # Get top 10 asks
+            hist_ask_table_source.data = {
+                'ask_price': np.array(asks_df['Price']).astype(str),
+                'ask_volume': asks_df['Quantity'],
+                'int_ask_price': [i for i in range(1, len(asks_df) + 1)],
+            }
 
-        hist_bid_table_source.data = {
-            'bid_price':  np.array(bids_df['Price']).astype(str),
-            'bid_volume': bids_df['Quantity'],
-            'int_bid_price': [i for i in range(1, len(bids_df) + 1)]
-        }
-        hist_ask_table_source.data = {
-            'ask_price': asks_df['Price'],
-            'ask_volume': asks_df['Quantity'],
-            'int_ask_price': [i for i in range(1, len(asks_df) + 1)]
-        }
+        nonlocal bid_book_fig, ask_book_fig
+        bid_book_fig.renderers = [r for r in bid_book_fig.renderers if not isinstance(r, bokeh.models.GlyphRenderer)]
+        ask_book_fig.renderers = [r for r in ask_book_fig.renderers if not isinstance(r, bokeh.models.GlyphRenderer)]
 
-        nonlocal p
-        # text1.x =int(max(bids_df['Quantity']) * 0.1) if not bids_df.empty else 0
-        # text2.x = int(max(bids_df['Quantity']) * 0.5) if not bids_df.empty else 0
-        x_max = max(bids_df['Quantity']) if not bids_df.empty else 0
-        p.text(x=int(x_max * 0.1), y='int_bid_price',
-                       text='bid_price', text_font_size="10pt", text_align="left",
-                       text_baseline="middle", color="black", source=hist_bid_table_source)
-
-        p.text(x=int(x_max * 0.5), y='int_bid_price',
-                       text='bid_volume', text_font_size="10pt", text_align="left",
-                       text_baseline="middle", color="black", source=hist_bid_table_source)
+        bid_book_fig.hbar(y='int_bid_price', right='bid_volume', height=0.8, source=hist_bid_table_source, color="forestgreen",
+               alpha=0.3)
+        ask_book_fig.hbar(y='int_ask_price', right='ask_volume', height=0.8, source=hist_ask_table_source, color="salmon",
+                alpha=0.3)
+        if not bids_df.empty:
+            x_max = max(bids_df['Quantity'])
+            y_max = max(hist_bid_table_source.data['int_bid_price'])
+            # Add price column to the left of the bid volume
+            bid_book_fig.text(x=x_max * 0.1, y='int_bid_price',
+                           text='bid_price', text_font_size="10pt", text_align="left",
+                           text_baseline="middle", color="forestgreen", source=hist_bid_table_source)
+            hist_bid_table_source.data['price_label'] = ["Price"] + [""] * (
+                        len(hist_bid_table_source.data['int_bid_price']) - 1)
+            bid_book_fig.text(x=x_max * 0.1, y=y_max + 1,
+                              text='price_label', text_font_size="10pt", text_align="left",
+                              text_baseline="middle", color="black", source=hist_bid_table_source)
+            # Add volume column to the right of the bid volume
+            bid_book_fig.text(x=x_max * 0.5, y='int_bid_price',
+                           text='bid_volume', text_font_size="10pt", text_align="left",
+                           text_baseline="middle", color="forestgreen", source=hist_bid_table_source)
+            hist_bid_table_source.data['volume_label'] = ["Volume"] + [""] * (
+                        len(hist_bid_table_source.data['int_bid_price']) - 1)
+            bid_book_fig.text(x=x_max * 0.5, y=y_max + 1,
+                              text='volume_label', text_font_size="10pt", text_align="left",
+                              text_baseline="middle", color="black", source=hist_bid_table_source)
+        if not asks_df.empty:
+            x_max = max(asks_df['Quantity'])
+            # Add price column to the left of the ask volume
+            ask_book_fig.text(x=x_max * 0.1, y='int_ask_price',
+                           text='ask_price', text_font_size="10pt", text_align="left",
+                           text_baseline="middle", color="red", source=hist_ask_table_source)
+            # Add volume column to the right of the ask volume
+            ask_book_fig.text(x=x_max * 0.5, y='int_ask_price',
+                           text='ask_volume', text_font_size="10pt", text_align="left",
+                           text_baseline="middle", color="red", source=hist_ask_table_source)
 
     send_button.on_click(send_order)
     delete_button.on_click(delete_order)
@@ -360,10 +367,20 @@ def main_page(doc):
         Div(text="<h3>Active orders</h3>"),
         order_table, delete_button, width=400, sizing_mode="stretch_both"
     )
-    info_table = column(change_today_text, imbalance_index_text, minimum_order_size_text, minimium_order_price_text,
-                        trading_fee_text, width=400, sizing_mode="stretch_width")
+    info_table = column(
+        Div(text="""
+        <div style="border: 2px solid rgba(0, 0, 0, 0.1); padding: 10px; width: 290px;">
+            <h3 style="margin: 5px 0;">Change Today: 0.0%</h3>
+            <h3 style="margin: 5px 0;">Imbalance Index: 0.0</h3>
+            <h3 style="margin: 5px 0;">Order Size Granularity: 1</h3>
+            <h3 style="margin: 5px 0;">Order Price Granularity: 0.01</h3>
+            <h3 style="margin: 5px 0;">Trading Fee: 0.1%</h3>
+        </div>
+        """),
+        sizing_mode="stretch_both"
+    )
 
-    table = column(info_top_row, p, info_table, width=400, sizing_mode="fixed")
+    table = column(info_top_row, bid_book_fig, ask_book_fig, info_table, width=300, sizing_mode="stretch_height")
     graphs = column(price_fig, hist_fig, width=750, sizing_mode="fixed")
     layout = row(table, graphs, controls, sizing_mode="stretch_both")
 
