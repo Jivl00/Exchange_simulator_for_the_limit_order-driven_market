@@ -1,6 +1,7 @@
 from src.client.algorithmic_trader import AlgorithmicTrader
 import json
 
+# https://chatgpt.com/c/67e4758b-9f70-8005-bab6-89af993b3369
 
 class MomentumTrader(AlgorithmicTrader):
     def __init__(self, name, server, config, lookback=5):
