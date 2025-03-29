@@ -59,6 +59,7 @@ def main_page(doc):
 
     price_source = ColumnDataSource(data={'x': [], 'bid_price': [], 'ask_price': []})
     order_source = ColumnDataSource(data={'ID': [], 'price': [], 'quantity': [], 'side': []})
+    history_source = ColumnDataSource(data={'time': [], 'price': [], 'quantity': [], 'side': []})
     hist_source = ColumnDataSource(data={'left': [], 'right': [], 'bid_top': [], 'ask_top': []})
     mid_price_source = ColumnDataSource(data={'x': [], 'y': []})
     hist_bid_table_source = ColumnDataSource(
@@ -83,6 +84,14 @@ def main_page(doc):
         TableColumn(field="side", title="Side"),
     ]
     order_table = DataTable(source=order_source, columns=columns, width=365, height=250)
+    # replace id colum with timestamp
+    columns[0] = TableColumn(field="time", title="Timestamp")
+    history_table = DataTable(source=history_source, columns=columns, height=200, sizing_mode="stretch_width")
+    history_table_group = GroupBox(
+        child=history_table,
+        title="Order History",
+        sizing_mode="stretch_width",
+    )
 
     # =====================
     # Graphs
@@ -353,6 +362,12 @@ def main_page(doc):
         side = "buy" if side_selector.active == 0 else "sell"
 
         trader.put_order({"side": side, "quantity": quantity, "price": price}, "product1")
+        history_source.stream({
+            'time': [datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")],  # Convert datetime to string
+            'price': [price],
+            'quantity': [quantity],
+            'side': [side]
+        })
         update()
 
     def delete_order():
@@ -491,7 +506,7 @@ def main_page(doc):
     )
 
     table = column(info_top_row, table_book_group, info_table_group, width=325, sizing_mode="stretch_height")
-    graphs = column(price_fig_group, hist_fig_group, width=750, sizing_mode="fixed")
+    graphs = column(price_fig_group, hist_fig_group, history_table_group, width=750, sizing_mode="fixed")
     layout = row(table, graphs, control_box, sizing_mode="stretch_both")
 
     # Add to document
