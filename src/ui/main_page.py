@@ -537,7 +537,6 @@ def main_page(doc):
 
 
     doc.title = "StackUnderflow Stocks"
-    doc.favicon = r"C:\Users\vladka\Documents\FAV\Exchange_simulator_for_the_limit_order-driven_market\src\ui\favicon_io\favicon.ico"
     # Add to document
     doc.add_root(layout)
     doc.add_periodic_callback(update, 1000)

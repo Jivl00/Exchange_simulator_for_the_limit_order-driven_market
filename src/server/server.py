@@ -351,17 +351,17 @@ class QuoteHandler(MsgHandler):
         product = message["product"]
         if not product_exists(product):
             return protocol.encode({"user_balance": None, "msg_type": "UserBalance"})
-        historical_books = product_manager.historical_order_books[product]
-        user_balances = [
-            {**book_data["UserBalance"][message["user"]], 'timestamp': book_data['Timestamp']}
-            for book in historical_books
-            if (book_data := json.loads(book)) and message["user"] in book_data["UserBalance"]
-        ]
+        # historical_books = product_manager.historical_order_books[product]
+        # user_balances = [
+        #     {**book_data["UserBalance"][message["user"]], 'timestamp': book_data['Timestamp']}
+        #     for book in historical_books
+        #     if (book_data := json.loads(book)) and message["user"] in book_data["UserBalance"]
+        # ]
         # Add current balance
-        user_balances.append(product_manager.get_order_book(product, False).user_balance[message["user"]])
+        user_balance = product_manager.get_order_book(product, False).user_balance[message["user"]]
         # user_balances[-1]['timestamp'] = time.time_ns()
         protocol.set_target(message["user"])
-        user_balances = {"history_balance": user_balances, "current_balance": user_balances[-1],
+        user_balances = {"current_balance": user_balance,
                          "budget": user_manager.users[message["user"]].budget,
                          "post_buy_budget": user_manager.users[message["user"]].post_buy_budget}
         return protocol.encode({"user_balance": user_balances, "msg_type": "UserBalance"})

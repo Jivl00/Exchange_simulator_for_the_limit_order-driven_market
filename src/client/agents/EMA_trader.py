@@ -45,7 +45,7 @@ class EMATrader(AlgorithmicTrader):
         ema = np.convolve(prices, weights, mode='valid')
         return ema[-1]
 
-config = json.load(open("config/server_config.json"))
+config = json.load(open("../config/server_config.json"))
 EMA_trader = EMATrader("EMA_trader", "server", config)
 EMA_trader.register(1000)
 EMA_trader.start_subscribe()
