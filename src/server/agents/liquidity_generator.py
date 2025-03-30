@@ -35,6 +35,8 @@ class SyntheticLiquidityProvider(AdminTrader, ABC):
             order_book = self.get_top_of_the_book(product) # get top of the order book
             bid_volume = sum([order["Quantity"] for order in order_book["Bids"]])
             ask_volume = sum([order["Quantity"] for order in order_book["Asks"]])
+            if bid_volume == 0 and ask_volume == 0:
+                continue  # Skip this iteration if both Bids and Asks are empty
             side = np.random.choice(["sell", "buy"], p=[bid_volume / (bid_volume + ask_volume), ask_volume / (bid_volume + ask_volume)])
             # randomly select a price
             if side == "buy":
