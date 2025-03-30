@@ -18,7 +18,7 @@ from bokeh.models import Legend
 from bokeh.layouts import column, row
 from bokeh.models import (
     ColumnDataSource, DataTable, TableColumn, Button, TextInput,
-    RadioButtonGroup, Div, HoverTool, LegendItem, GroupBox
+    RadioButtonGroup, Div, HoverTool, LegendItem, GroupBox, CustomJS
 )
 from ui.web_trader import WebTrader
 
@@ -53,6 +53,7 @@ def main_page(doc):
     balance_text = Div(text=f"", width=300)
     quantity_text = Div(text=f"", width=300)
     fee_text = Div(text=f"", width=300)
+    popup = Div(text=f"", width=300)
 
     price_source = ColumnDataSource(data={'x': [], 'bid_price': [], 'ask_price': []})
     order_source = ColumnDataSource(data={'ID': [], 'price': [], 'quantity': [], 'side': []})
@@ -353,19 +354,45 @@ def main_page(doc):
             price_source.stream(new_data, rollover=50)
         return mid_price, imbalance
 
+    def hide_popup():
+        popup.styles = {"display": "none"}
+
     def send_order():
         price = float(price_input.value)
         quantity = int(quantity_input.value)
         side = "buy" if side_selector.active == 0 else "sell"
 
-        trader.put_order({"side": side, "quantity": quantity, "price": price}, "product1")
-        history_source.stream({
-            'time': [datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")],  # Convert datetime to string
-            'price': [price],
-            'quantity': [quantity],
-            'side': [side]
-        })
-        update()
+        _, status = trader.put_order({"side": side, "quantity": quantity, "price": price}, "product1")
+        if status is False:
+            alert_message = "Order put failed. Please check the order details and remaining balance."
+            popup.text = f"""
+                <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+                    <span style="{label_style}">Status:</span>
+                    <span style="{value_style}; color: red;">{alert_message}</span>
+                </div>
+            """
+        else:
+            alert_message = ""
+            if status is True:
+                alert_message = "Order successfully added to the order book."
+            elif status is None:
+                alert_message = "Order fulfilled successfully."
+
+            popup.text = f"""
+                <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+                    <span style="{label_style}">Status:</span>
+                    <span style="{value_style}; color: green;">{alert_message}</span>
+                </div>
+            """
+            history_source.stream({
+                'time': [datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")],  # Convert datetime to string
+                'price': [price],
+                'quantity': [quantity],
+                'side': [side]
+            })
+            update()
+        popup.styles = {"display": "block"}
+        doc.add_timeout_callback(hide_popup, 3000)
 
     def delete_order():
         selected = order_source.selected.indices
@@ -479,7 +506,8 @@ def main_page(doc):
     # Layouts
     info_top_row = row(product_info, sizing_mode="stretch_width")
     new_order_group = GroupBox(
-        child=column(balance_text, quantity_text,fee_text, price_input, quantity_input, side_selector, send_button),
+        child=column(balance_text, quantity_text,fee_text, price_input, quantity_input, side_selector, send_button,
+                     popup),
         title="New Order",
         sizing_mode="stretch_width",
     )
@@ -507,6 +535,9 @@ def main_page(doc):
     graphs = column(price_fig_group, hist_fig_group, history_table_group, width=750, sizing_mode="fixed")
     layout = row(table, graphs, control_box, sizing_mode="stretch_both")
 
+
+    doc.title = "StackUnderflow Stocks"
+    doc.favicon = r"C:\Users\vladka\Documents\FAV\Exchange_simulator_for_the_limit_order-driven_market\src\ui\favicon_io\favicon.ico"
     # Add to document
     doc.add_root(layout)
     doc.add_periodic_callback(update, 1000)
