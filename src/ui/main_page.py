@@ -17,7 +17,7 @@ from bokeh.application.handlers.function import FunctionHandler
 from bokeh.models import DatetimeTickFormatter
 from bokeh.plotting import figure
 from bokeh.models import Legend
-from bokeh.layouts import column, row, layout
+from bokeh.layouts import column, row
 from bokeh.models import (
     ColumnDataSource, DataTable, TableColumn, Button, TextInput,
     RadioButtonGroup, Div, HoverTool, LegendItem, GroupBox, CustomJS
@@ -60,19 +60,13 @@ def main_page(doc):
     order_source = ColumnDataSource(data={'ID': [], 'price': [], 'quantity': [], 'side': []})
     history_source = ColumnDataSource(data={'time': [], 'price': [], 'quantity': [], 'side': []})
     hist_source = ColumnDataSource(data={'left': [], 'right': [], 'bid_top': [], 'ask_top': []})
-    mid_price_source = ColumnDataSource(data={'x': [], 'y': []})
+    mid_price_source = ColumnDataSource(data={'x': [0,0], 'y': [0,0]})
     hist_bid_table_source = ColumnDataSource(
         data={'bid_price': [], 'bid_quantity': [], 'int_bid_price': [], 'price_label': [],
               'price_pos': [], 'quantity_label': [], 'quantity_pos': []})
     hist_ask_table_source = ColumnDataSource(
         data={'ask_price': [], 'ask_quantity': [], 'int_ask_price': [], 'price_pos': [], 'quantity_pos': []})
     popup_source = ColumnDataSource(data={'messages': [], 'colors': [], 'timestamps': []})
-
-    def create_notification(message, color):
-        return Div(text=f"<div style='background-color: {color}; color: white; padding: 10px; "
-                        f"border-radius: 5px; margin-bottom: 5px; font-weight: bold; text-align: center;'>"
-                        f"{message}</div>", width=400)
-
     notifications_container = Div(
         text="<div id='toast-container' style='position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); "
              "display: flex; flex-direction: column; align-items: center; width: 400px;'></div>", )
@@ -335,8 +329,8 @@ def main_page(doc):
     def calculate_imbalance_index(asks, bids, alpha=0.5, level=3):
         """
         Calculate imbalance index for a given orderbook.
-        :param asks: list of ask sizes (quantitys)
-        :param bids: list of bid sizes (quantitys)
+        :param asks: list of ask sizes (quantities)
+        :param bids: list of bid sizes (quantities)
         :param alpha: parameter for imbalance index
         :param level: number of levels to consider
         :return: imbalance index
@@ -354,8 +348,8 @@ def main_page(doc):
         bids = order_book["Bids"]
         asks = order_book["Asks"]
         # datetime.datetime.min + datetime.timedelta(seconds=t // 1e9)
-        time = order_book["Timestamp"] / 1e9  # Convert nanoseconds to seconds
-        time = datetime.datetime.fromtimestamp(time)
+        seconds = order_book["Timestamp"] / 1e9  # Convert nanoseconds to seconds
+        seconds = datetime.datetime.fromtimestamp(seconds)
         bid_price = bids[0]["Price"] if bids else np.nan
         ask_price = asks[0]["Price"] if asks else np.nan
         mid_price = np.nan
@@ -372,7 +366,7 @@ def main_page(doc):
             mid_price_source.data['x'] = [mid_price, mid_price]
 
             new_data = {
-                'x': [time],
+                'x': [seconds],
                 'bid_price': [bid_price],
                 'ask_price': [ask_price],
             }
@@ -485,9 +479,9 @@ def main_page(doc):
         ask_bin_heights = np.zeros(len(bin_edges) - 1)
 
         # Accumulate the quantity for each price in the appropriate bin (bids in green, asks in red)
-        for i, row in df.iterrows():
-            price = row['Price']
-            quantity = row['Quantity']
+        for i, item in df.iterrows():
+            price = item['Price']
+            quantity = item['Quantity']
 
             # Find the bin index for the current price
             bin_index = min(np.digitize(price, bin_edges) - 1, len(bid_bin_heights) - 1)
@@ -581,9 +575,9 @@ def main_page(doc):
     )
 
     table = column(info_top_row, table_book_group, info_table_group, width=325, sizing_mode="stretch_height")
-    graphs = column(price_fig_group, hist_fig_group, history_table_group, width=750, sizing_mode="fixed")
+    graphs = column(price_fig_group, hist_fig_group, history_table_group, width=750, sizing_mode="stretch_height")
     ui_layout = row(table, graphs, control_box, sizing_mode="stretch_both")
-    ui_layout = layout([[ui_layout, notifications_container]])
+    ui_layout = column(ui_layout, notifications_container, sizing_mode="stretch_both")
 
     doc.title = "StackUnderflow Stocks"
     # Add to document
