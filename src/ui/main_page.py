@@ -1,5 +1,6 @@
 import json
 import logging
+import time
 
 import numpy as np
 import pandas as pd
@@ -7,6 +8,7 @@ import datetime
 import tornado
 import os
 import sys
+
 sys.path.append(os.path.join(os.path.dirname(__file__), '../..'))
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 from bokeh.server.server import Server
@@ -15,7 +17,7 @@ from bokeh.application.handlers.function import FunctionHandler
 from bokeh.models import DatetimeTickFormatter
 from bokeh.plotting import figure
 from bokeh.models import Legend
-from bokeh.layouts import column, row
+from bokeh.layouts import column, row, layout
 from bokeh.models import (
     ColumnDataSource, DataTable, TableColumn, Button, TextInput,
     RadioButtonGroup, Div, HoverTool, LegendItem, GroupBox, CustomJS
@@ -25,13 +27,13 @@ from ui.web_trader import WebTrader
 logging.getLogger('bokeh').setLevel(logging.INFO)
 config = json.load(open("../config/server_config.json"))
 
-
 # =====================
 # Backend Variables
 # =====================
 common_style = "font-family: 'Arial', sans-serif; font-size: 12px;"
 label_style = f"{common_style} color: rgba(0, 0, 0, 0.5);"
 value_style = f"{common_style} color: rgba(0, 0, 0, 1);"
+
 
 # =====================
 # Bokeh App Initialization
@@ -53,7 +55,6 @@ def main_page(doc):
     balance_text = Div(text=f"", width=300)
     quantity_text = Div(text=f"", width=300)
     fee_text = Div(text=f"", width=300)
-    popup = Div(text=f"", width=300)
 
     price_source = ColumnDataSource(data={'x': [], 'bid_price': [], 'ask_price': []})
     order_source = ColumnDataSource(data={'ID': [], 'price': [], 'quantity': [], 'side': []})
@@ -65,22 +66,35 @@ def main_page(doc):
               'price_pos': [], 'quantity_label': [], 'quantity_pos': []})
     hist_ask_table_source = ColumnDataSource(
         data={'ask_price': [], 'ask_quantity': [], 'int_ask_price': [], 'price_pos': [], 'quantity_pos': []})
+    popup_source = ColumnDataSource(data={'messages': [], 'colors': [], 'timestamps': []})
+
+    def create_notification(message, color):
+        return Div(text=f"<div style='background-color: {color}; color: white; padding: 10px; "
+                        f"border-radius: 5px; margin-bottom: 5px; font-weight: bold; text-align: center;'>"
+                        f"{message}</div>", width=400)
+
+    notifications_divs = [create_notification("", "transparent") for _ in range(5)]
+    notifications_column = column(*notifications_divs)
+
+    notifications_container = Div(
+        text="<div id='toast-container' style='position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); "
+             "display: flex; flex-direction: column; align-items: center; width: 400px;'></div>", )
 
     # =====================
     # Order Management UI
     # =====================
     user_id_input = TextInput(title="User ID", value=user_id, width=300)
     user_id_input.js_on_change('value', CustomJS(args=dict(input=user_id_input, initial_value=user_id), code="""
-    if (window.confirmationShown) {
-        window.confirmationShown = false;
-        return;
-    }
-    var confirmed = confirm("Modifying the User ID will reset the session. Do you want to continue? Providing an invalid User ID will cause the app to become unresponsive as it will be blacklisted by the server.");
-    if (!confirmed) {
-        window.confirmationShown = true;
-        input.value = initial_value;
-    }
-"""))
+        if (window.confirmationShown) {
+            window.confirmationShown = false;
+            return;
+        }
+        var confirmed = confirm("Modifying the User ID will reset the session. Do you want to continue? Providing an invalid User ID will cause the app to become unresponsive as it will be blacklisted by the server.");
+        if (!confirmed) {
+            window.confirmationShown = true;
+            input.value = initial_value;
+        }
+    """))
     login_button = Button(label="Login", button_type="success", width=300)
     price_input = TextInput(title="Price", value="100")
     quantity_input = TextInput(title="Quantity", value="1")
@@ -206,31 +220,31 @@ def main_page(doc):
     ask_book_fig.toolbar.logo = None
 
     bid_book_fig.hbar(y='int_bid_price', right='bid_quantity', height=0.8, source=hist_bid_table_source,
-    color = "forestgreen", alpha = 0.3)
+                      color="forestgreen", alpha=0.3)
     ask_book_fig.hbar(y='int_ask_price', right='ask_quantity', height=0.8, source=hist_ask_table_source, color="salmon",
-    alpha = 0.3)
+                      alpha=0.3)
     # Add price column to the left of the bid quantity
     bid_book_fig.text(x='price_pos', y='int_bid_price',
-    text = 'bid_price', text_font_size = "10pt", text_align = "left",
-    text_baseline = "middle", color = "forestgreen", source = hist_bid_table_source)
+                      text='bid_price', text_font_size="10pt", text_align="left",
+                      text_baseline="middle", color="forestgreen", source=hist_bid_table_source)
     bid_book_fig.text(x='price_pos', y='int_bid_price',
-    text = 'price_label', text_font_size = "10pt", text_align = "left",
-    text_baseline = "middle", color = "black", source = hist_bid_table_source)
+                      text='price_label', text_font_size="10pt", text_align="left",
+                      text_baseline="middle", color="black", source=hist_bid_table_source)
     # Add quantity column to the right of the bid quantity
     bid_book_fig.text(x='quantity_pos', y='int_bid_price',
-    text = 'bid_quantity', text_font_size = "10pt", text_align = "left",
-    text_baseline = "middle", color = "forestgreen", source = hist_bid_table_source)
+                      text='bid_quantity', text_font_size="10pt", text_align="left",
+                      text_baseline="middle", color="forestgreen", source=hist_bid_table_source)
     bid_book_fig.text(x='quantity_pos', y='int_bid_price',
-    text = 'quantity_label', text_font_size = "10pt", text_align = "left",
-    text_baseline = "middle", color = "black", source = hist_bid_table_source)
+                      text='quantity_label', text_font_size="10pt", text_align="left",
+                      text_baseline="middle", color="black", source=hist_bid_table_source)
     # Add price column to the left of the ask quantity
     ask_book_fig.text(x='price_pos', y='int_ask_price',
-    text = 'ask_price', text_font_size = "10pt", text_align = "left",
-    text_baseline = "middle", color = "red", source = hist_ask_table_source)
+                      text='ask_price', text_font_size="10pt", text_align="left",
+                      text_baseline="middle", color="red", source=hist_ask_table_source)
     # Add quantity column to the right of the ask quantity
     ask_book_fig.text(x='quantity_pos', y='int_ask_price',
-    text = 'ask_quantity', text_font_size = "10pt", text_align = "left",
-    text_baseline = "middle", color = "red", source = hist_ask_table_source)
+                      text='ask_quantity', text_font_size="10pt", text_align="left",
+                      text_baseline="middle", color="red", source=hist_ask_table_source)
 
     table_book_group = GroupBox(
         child=column(bid_book_fig, ask_book_fig),
@@ -368,8 +382,34 @@ def main_page(doc):
             price_source.stream(new_data, rollover=50)
         return mid_price, imbalance
 
-    def hide_popup():
-        popup.styles = {"display": "none"}
+    def add_notification(message, color):
+        timestamp = time.time()  # Get current time
+        new_data = dict(messages=[message], colors=[color], timestamps=[timestamp])
+        popup_source.stream(new_data, rollover=5)  # Keeps only the last 5 notifications
+
+    def update_popup():
+        current_time = time.time()
+        data = popup_source.data
+        messages, colors, timestamps = data.get("messages", []), data.get("colors", []), data.get("timestamps", [])
+
+        # Remove messages older than 3 seconds
+        new_messages, new_colors, new_timestamps = [], [], []
+        for msg, col, ts in zip(messages, colors, timestamps):
+            if current_time - ts < 3:  # Keep only recent messages
+                new_messages.append(msg)
+                new_colors.append(col)
+                new_timestamps.append(ts)
+
+        popup_source.data = {'messages': new_messages, 'colors': new_colors, 'timestamps': new_timestamps}
+
+        # Update UI
+        html_content = "<div id='toast-container' style='position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); " \
+                          "display: flex; flex-direction: column; align-items: center; width: 400px;'>"
+        for i in range(len(new_messages)):
+            html_content += f"<div style='background-color: {new_colors[i]}; color: white; padding: 10px; " \
+                            f"border-radius: 5px; margin-bottom: 5px; font-weight: bold; text-align: center;'>{new_messages[i]}</div>"
+        html_content += "</div>"
+        notifications_container.text = html_content
 
     def send_order():
         price = float(price_input.value)
@@ -379,25 +419,14 @@ def main_page(doc):
         _, status = trader.put_order({"side": side, "quantity": quantity, "price": price}, "product1")
         if status is False:
             alert_message = "Order put failed. Please check the order details and remaining balance."
-            popup.text = f"""
-                <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
-                    <span style="{label_style}">Status:</span>
-                    <span style="{value_style}; color: red;">{alert_message}</span>
-                </div>
-            """
+            add_notification(alert_message, "red")
         else:
             alert_message = ""
             if status is True:
                 alert_message = "Order successfully added to the order book."
             elif status is None:
                 alert_message = "Order fulfilled successfully."
-
-            popup.text = f"""
-                <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
-                    <span style="{label_style}">Status:</span>
-                    <span style="{value_style}; color: green;">{alert_message}</span>
-                </div>
-            """
+            add_notification(alert_message, "green")
             history_source.stream({
                 'time': [datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")],  # Convert datetime to string
                 'price': [price],
@@ -405,9 +434,6 @@ def main_page(doc):
                 'side': [side]
             })
             update()
-        popup.styles = {"display": "block"}
-        doc.add_timeout_callback(hide_popup, 3000)
-
     def delete_order():
         selected = order_source.selected.indices
         if not selected or not order_source.data['ID'] or selected[0] >= len(order_source.data['ID']):
@@ -475,8 +501,6 @@ def main_page(doc):
             'ask_top': ask_bin_heights,  # Cumulative ask quantity for each bin
         }
 
-
-
     def update_histogram_table(order_book):
         bids_df = pd.DataFrame(order_book.get('Bids', []))
         asks_df = pd.DataFrame(order_book.get('Asks', []))
@@ -526,8 +550,7 @@ def main_page(doc):
         sizing_mode="stretch_width",
     )
     new_order_group = GroupBox(
-        child=column(balance_text, quantity_text,fee_text, price_input, quantity_input, side_selector, send_button,
-                     popup),
+        child=column(balance_text, quantity_text, fee_text, price_input, quantity_input, side_selector, send_button),
         title="New Order",
         sizing_mode="stretch_width",
     )
@@ -554,13 +577,14 @@ def main_page(doc):
 
     table = column(info_top_row, table_book_group, info_table_group, width=325, sizing_mode="stretch_height")
     graphs = column(price_fig_group, hist_fig_group, history_table_group, width=750, sizing_mode="fixed")
-    layout = row(table, graphs, control_box, sizing_mode="stretch_both")
-
+    ui_layout = row(table, graphs, control_box, sizing_mode="stretch_both")
+    ui_layout = layout([[ui_layout, notifications_container]])
 
     doc.title = "StackUnderflow Stocks"
     # Add to document
-    doc.add_root(layout)
+    doc.add_root(ui_layout)
     doc.add_periodic_callback(update, 1000)
+    doc.add_periodic_callback(update_popup, 500)
 
 
 def make_app():
