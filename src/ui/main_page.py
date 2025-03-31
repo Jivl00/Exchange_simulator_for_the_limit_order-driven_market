@@ -40,7 +40,7 @@ def main_page(doc):
     # Reinitialize models to ensure they are unique per session
     initial_balance = 10000
     trader = WebTrader("bokeh", "server", config)
-    trader.register(initial_balance)
+    user_id = trader.register(initial_balance)
 
     # Top screen info
     product_info = Div(text="<h1 style='opacity: 0.5;'>StackUnderflow Stocks</h1>", width=300)
@@ -69,6 +69,8 @@ def main_page(doc):
     # =====================
     # Order Management UI
     # =====================
+    user_id_input = TextInput(title="User ID", value=user_id, width=300)
+    login_button = Button(label="Login", button_type="success", width=300)
     price_input = TextInput(title="Price", value="100")
     quantity_input = TextInput(title="Quantity", value="1")
     side_selector = RadioButtonGroup(labels=["Buy", "Sell"], active=0)
@@ -106,6 +108,7 @@ def main_page(doc):
         outline_line_color=None
     )
     price_fig.toolbar.logo = None
+    price_fig.background_fill_color = "#f9f9f9"
 
     bid_line = price_fig.line('x', 'bid_price', source=price_source, line_width=4, color='green', alpha=0.5)
     ask_line = price_fig.line('x', 'ask_price', source=price_source, line_width=4, color='red', alpha=0.5)
@@ -396,12 +399,12 @@ def main_page(doc):
 
     def delete_order():
         selected = order_source.selected.indices
-        if not selected or not order_source.data['ID']:
+        if not selected or not order_source.data['ID'] or selected[0] >= len(order_source.data['ID']):
             return
         order_id = order_source.data['ID'][selected[0]]
         if order_id:
             trader.delete_order(order_id, "product1")
-            update()
+        update()
 
     def update_histogram(order_book):
 
@@ -500,11 +503,17 @@ def main_page(doc):
             hist_ask_table_source.data = {'ask_price': [], 'ask_quantity': [], 'int_ask_price': [], 'price_pos': [],
                                           'quantity_pos': []}
 
+    login_button.on_click(lambda: trader.PROTOCOL.set_sender(user_id_input.value))
     send_button.on_click(send_order)
     delete_button.on_click(delete_order)
 
     # Layouts
     info_top_row = row(product_info, sizing_mode="stretch_width")
+    user_id_group = GroupBox(
+        child=column(user_id_input, login_button),
+        title="Login",
+        sizing_mode="stretch_width",
+    )
     new_order_group = GroupBox(
         child=column(balance_text, quantity_text,fee_text, price_input, quantity_input, side_selector, send_button,
                      popup),
@@ -516,6 +525,7 @@ def main_page(doc):
         title="Active User Orders",
     )
     controls = column(
+        user_id_group,
         new_order_group,
         user_orders_group, width=400, sizing_mode="stretch_height",
     )
