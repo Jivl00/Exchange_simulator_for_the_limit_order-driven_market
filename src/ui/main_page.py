@@ -73,9 +73,6 @@ def main_page(doc):
                         f"border-radius: 5px; margin-bottom: 5px; font-weight: bold; text-align: center;'>"
                         f"{message}</div>", width=400)
 
-    notifications_divs = [create_notification("", "transparent") for _ in range(5)]
-    notifications_column = column(*notifications_divs)
-
     notifications_container = Div(
         text="<div id='toast-container' style='position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); "
              "display: flex; flex-direction: column; align-items: center; width: 400px;'></div>", )
@@ -412,21 +409,29 @@ def main_page(doc):
         notifications_container.text = html_content
 
     def send_order():
-        price = float(price_input.value)
-        quantity = int(quantity_input.value)
+        try:
+            price = float(price_input.value)
+        except ValueError:
+            add_notification("Invalid price entered. Please enter a valid number.", "salmon")
+            return
+        try:
+            quantity = int(quantity_input.value)
+        except ValueError:
+            add_notification("Invalid quantity entered. Please enter a valid number.", "salmon")
+            return
         side = "buy" if side_selector.active == 0 else "sell"
 
         _, status = trader.put_order({"side": side, "quantity": quantity, "price": price}, "product1")
         if status is False:
             alert_message = "Order put failed. Please check the order details and remaining balance."
-            add_notification(alert_message, "red")
+            add_notification(alert_message, "salmon")
         else:
             alert_message = ""
             if status is True:
                 alert_message = "Order successfully added to the order book."
             elif status is None:
                 alert_message = "Order fulfilled successfully."
-            add_notification(alert_message, "green")
+            add_notification(alert_message, "#5cb85c")
             history_source.stream({
                 'time': [datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")],  # Convert datetime to string
                 'price': [price],
