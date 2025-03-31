@@ -12,7 +12,6 @@ from src.server.server import products
 
 logging.getLogger("urllib3").setLevel(logging.WARNING)  # suppress logging
 
-
 class MarketMaker(AdminTrader, ABC):
     def __init__(self, target, config, bid_ask_spread=0.5, window=10, volatility_multiplier=0.5, initial_emission=500,
                  starting_price=100, initial_num_orders=10, budget=50000, volume=None):
@@ -77,27 +76,31 @@ class MarketMaker(AdminTrader, ABC):
 
     def generate_market_data(self):
         while True:
-            time.sleep(1)  # sleep for 1 second
-            for product in products:
-                bids, asks = self.get_historical_mid_prices(product)
-                dynamic_spread = self.calculate_dynamic_spread(product)
-                side = None
-                price = None
+            try:
+                time.sleep(1)  # sleep for 1 second
+                for product in products:
+                    bids, asks = self.get_historical_mid_prices(product)
+                    dynamic_spread = self.calculate_dynamic_spread(product)
+                    side = None
+                    price = None
 
-                if not self.mid_prices.get(product):  # Ensure price history is available
-                    continue
+                    if not self.mid_prices.get(product):  # Ensure price history is available
+                        continue
 
-                if not bids:
-                    side = "buy"
-                    price = self.mid_prices[product][-1] - dynamic_spread
-                if not asks:
-                    side = "sell"
-                    price = self.mid_prices[product][-1] + dynamic_spread
-                if side:
-                    quantity = self.compute_quantity(product, side, price)
-                    if quantity > 0:
-                        self.put_order({"side": side, "quantity": quantity, "price": price}, product)
-                        logging.info(f"Synthetic liquidity added: {side} order at {price} for {quantity} {product}")
+                    if not bids:
+                        side = "buy"
+                        price = self.mid_prices[product][-1] - dynamic_spread
+                    if not asks:
+                        side = "sell"
+                        price = self.mid_prices[product][-1] + dynamic_spread
+                    if side:
+                        quantity = self.compute_quantity(product, side, price)
+                        if quantity > 0:
+                            self.put_order({"side": side, "quantity": quantity, "price": price}, product)
+                            logging.info(f"Synthetic liquidity added: {side} order at {price} for {quantity} {product}")
+            except Exception as e:
+                logging.error(f"Error in generating market data: {e}")
+                continue
 
     def initialize_market(self, scale=0.1):
         for product in products:
