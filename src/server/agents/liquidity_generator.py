@@ -29,39 +29,45 @@ class SyntheticLiquidityProvider(AdminTrader, ABC):
 
     def generate_liquidity(self):
         while True:
-            time.sleep(random.randint(1, 5)) # sleep for 1-5 seconds
-            product = random.choice(products) # randomly select a product to trade
-            product = "product1" # TODO: Remove this line
-            order_book = self.get_top_of_the_book(product) # get top of the order book
-            bid_volume = sum([order["Quantity"] for order in order_book["Bids"]])
-            ask_volume = sum([order["Quantity"] for order in order_book["Asks"]])
-            if bid_volume == 0 and ask_volume == 0:
-                continue  # Skip this iteration if both Bids and Asks are empty
-            side = np.random.choice(["sell", "buy"], p=[bid_volume / (bid_volume + ask_volume), ask_volume / (bid_volume + ask_volume)])
-            # randomly select a price
-            if side == "buy":
-                if order_book["Bids"]:
-                    price = order_book["Bids"][0]["Price"]
-                elif order_book["Asks"]:
-                    price = order_book["Asks"][0]["Price"]
-                else:
+            try:
+                time.sleep(random.randint(1, 5)) # sleep for 1-5 seconds
+                product = random.choice(products) # randomly select a product to trade
+                order_book = self.get_top_of_the_book(product) # get top of the order book
+                bid_volume = sum([order["Quantity"] for order in order_book["Bids"]])
+                ask_volume = sum([order["Quantity"] for order in order_book["Asks"]])
+                if bid_volume == 0 and ask_volume == 0:
                     continue  # Skip this iteration if both Bids and Asks are empty
-            else:
-                if order_book["Asks"]:
-                    price = order_book["Asks"][0]["Price"]
-                elif order_book["Bids"]:
-                    price = order_book["Bids"][0]["Price"]
+                side = np.random.choice(["sell", "buy"], p=[bid_volume / (bid_volume + ask_volume), ask_volume / (bid_volume + ask_volume)])
+                # randomly select a price
+                if side == "buy":
+                    if order_book["Bids"]:
+                        price = order_book["Bids"][0]["Price"]
+                    elif order_book["Asks"]:
+                        price = order_book["Asks"][0]["Price"]
+                    else:
+                        continue  # Skip this iteration if both Bids and Asks are empty
                 else:
-                    continue  # Skip this iteration if both Bids and Asks are empty
-            self.delete_dispensable_orders(product, price, 1, 30)
-            price = price + random.uniform(-0.1, 0.1) # add some noise to the price
-            quantity = self.compute_quantity(product, side, price)
-            if quantity > 0:
-                self.put_order({"side": side, "quantity": quantity, "price": price}, product)
-                logging.info(f"Synthetic liquidity added: {side} order at {price} for {quantity} {product}")
-                # print(self.user_balance(product)["current_balance"])
+                    if order_book["Asks"]:
+                        price = order_book["Asks"][0]["Price"]
+                    elif order_book["Bids"]:
+                        price = order_book["Bids"][0]["Price"]
+                    else:
+                        continue  # Skip this iteration if both Bids and Asks are empty
+                self.delete_dispensable_orders(product, price, 1, 30)
+                price = price + random.uniform(-0.1, 0.1) # add some noise to the price
+                quantity = self.compute_quantity(product, side, price)
+                if quantity > 0:
+                    self.put_order({"side": side, "quantity": quantity, "price": price}, product)
+                    logging.info(f"Synthetic liquidity added: {side} order at {price} for {quantity} {product}")
+                    # print(self.user_balance(product)["current_balance"])
+            except Exception as e:
+                logging.error(f"Error in generating liquidity: {e}")
+                continue
 
 if __name__ == "__main__":
-    config = json.load(open("../config/server_config.json"))
-    liquidity_generator = SyntheticLiquidityProvider("server", config)
-    liquidity_generator.generate_liquidity()
+    try:
+        config = json.load(open("../config/server_config.json"))
+        liquidity_generator = SyntheticLiquidityProvider("server", config)
+        liquidity_generator.generate_liquidity()
+    except KeyboardInterrupt:
+        logging.info("Liquidity generator stopped by user.")
