@@ -70,6 +70,17 @@ def main_page(doc):
     # Order Management UI
     # =====================
     user_id_input = TextInput(title="User ID", value=user_id, width=300)
+    user_id_input.js_on_change('value', CustomJS(args=dict(input=user_id_input, initial_value=user_id), code="""
+    if (window.confirmationShown) {
+        window.confirmationShown = false;
+        return;
+    }
+    var confirmed = confirm("Modifying the User ID will reset the session. Do you want to continue? Providing an invalid User ID will cause the app to become unresponsive as it will be blacklisted by the server.");
+    if (!confirmed) {
+        window.confirmationShown = true;
+        input.value = initial_value;
+    }
+"""))
     login_button = Button(label="Login", button_type="success", width=300)
     price_input = TextInput(title="Price", value="100")
     quantity_input = TextInput(title="Quantity", value="1")
