@@ -421,8 +421,8 @@ class WebSocketHandler(tornado.websocket.WebSocketHandler):
         """
         Handles messages from the client.
         """
-        # pass
-        self.write_message(f">{message}")
+        pass
+        # self.write_message(f">{message}")
 
     @classmethod
     def broadcast(cls, message):
@@ -454,10 +454,9 @@ def save_data():
         report = product_manager.get_historical_order_books(product, -1)
         report.append(product_manager.get_order_book(product, False).copy().jsonify_order_book())
         data_to_save[product] = {"order_books": report, "users": user_manager.users}
-    file_name = time.strftime("%Y%m%d-%H%M%S") + "server_data.pickle"
+    file_name = "../data/" + time.strftime("%Y-%m-%d_%H-%M-%S") + "-server_data.pickle"
     with open(file_name, 'wb') as f:
         pickle.dump(data_to_save, f)
-    print("Data saved to server_data.pickle")
 
 # Register the save_data function to be called at exit
 atexit.register(save_data)
