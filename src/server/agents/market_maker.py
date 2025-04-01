@@ -54,6 +54,11 @@ class MarketMaker(AdminTrader, ABC):
         pass
 
     def calculate_dynamic_spread(self, product):
+        """
+        Calculate the dynamic spread based on the volatility of the mid-price.
+        :param product: Product name
+        :return: Dynamic spread
+        """
         if product not in self.mid_prices:
             return self.bid_ask_spread
         if len(self.mid_prices[product]) < self.window:
@@ -62,6 +67,11 @@ class MarketMaker(AdminTrader, ABC):
         return max(self.bid_ask_spread, volatility * self.volatility_multiplier)
 
     def get_historical_mid_prices(self, product):
+        """
+        Get historical mid-prices for a product.
+        :param product: Product name
+        :return: Bids and Asks from historical order books
+        """
         historical_order_books = self.historical_order_books(product, self.window, verbose=False)
         self.mid_prices[product] = []
         bids, asks = None, None
@@ -75,9 +85,12 @@ class MarketMaker(AdminTrader, ABC):
         return bids, asks
 
     def generate_market_data(self):
+        """
+        Generate market data by placing orders based on historical mid-prices.
+        """
         while True:
             try:
-                time.sleep(1)  # sleep for 1 second
+                time.sleep(1)  # Sleep for 1 second
                 for product in products:
                     bids, asks = self.get_historical_mid_prices(product)
                     dynamic_spread = self.calculate_dynamic_spread(product)
@@ -103,6 +116,10 @@ class MarketMaker(AdminTrader, ABC):
                 continue
 
     def initialize_market(self, scale=0.1):
+        """
+        Initialize the market by adding initial liquidity.
+        :param scale: Scale factor for exponential distribution
+        """
         for product in products:
             num_orders = self.initial_num_orders[product]
             bid_prices = np.sort(self.starting_price[product] - np.random.exponential(scale * num_orders, num_orders))
