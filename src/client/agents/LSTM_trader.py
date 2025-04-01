@@ -120,6 +120,9 @@ class DeepLearningTrader(AlgorithmicTrader):
         spread = np.array(asks) - np.array(bids)
         momentum = np.diff(mid_prices, prepend=mid_prices[0])
 
+        # Delete dispensable orders
+        self.delete_dispensable_orders(product, mid_prices[-1], 1, 60)
+
         return np.column_stack((bids, asks, bid_volumes, ask_volumes, imbalances, spread, momentum))
 
     def predict_price(self, product):

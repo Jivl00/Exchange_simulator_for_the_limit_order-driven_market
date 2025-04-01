@@ -61,6 +61,9 @@ class RegressionTrader(AlgorithmicTrader):
             self.volumes[product]["bid"].append(bid_volume)
             self.volumes[product]["ask"].append(ask_volume)
 
+            # Delete dispensable orders
+            self.delete_dispensable_orders(product, mid_price, 1, 60)
+
             # Adjust window size dynamically based on volatility (rolling standard deviation)
             if len(self.prices[product]["mid"]) > 2:
                 vol = np.std(self.prices[product]["mid"][-self.window_size:])
