@@ -101,18 +101,7 @@ class RegressionTrader(AlgorithmicTrader):
             current_bid = self.prices[product]["bid"][-1]
             current_ask = self.prices[product]["ask"][-1]
 
-            # Sell when predicted bid > current bid
-            if predicted_bid > current_bid + self.price_threshold:
-                quantity = self.compute_quantity(product, "sell", predicted_bid)
-                if quantity > 0:
-                    self.put_order({"side": "sell", "quantity": quantity, "price": predicted_bid}, product)
-
-            # Buy when predicted ask < current ask
-            if predicted_ask < current_ask - self.price_threshold:
-                quantity = self.compute_quantity(product, "buy", predicted_ask)
-                if quantity > 0:
-                    self.put_order({"side": "buy", "quantity": quantity, "price": predicted_ask}, product)
-
+            self.bid_ask_trade((current_bid, current_ask), (predicted_bid, predicted_ask), self.price_threshold, product)
 
 # Setup and run the RegressionTrader
 config = json.load(open("../config/server_config.json"))

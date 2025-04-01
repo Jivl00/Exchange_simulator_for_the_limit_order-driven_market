@@ -1,4 +1,4 @@
-from abc import abstractmethod
+import numpy as np
 from src.client.client import Trader
 
 class AlgorithmicTrader (Trader):
@@ -47,6 +47,47 @@ class AlgorithmicTrader (Trader):
         else:
             return None
 
+    def imbalance_index(self, asks, bids, alpha=0.5, level=3):
+        """
+        Calculate imbalance index for a given orderbook.
+        :param asks: list of ask sizes (quantities)
+        :param bids: list of bid sizes (quantities)
+        :param alpha: parameter for imbalance index
+        :param level: number of levels to consider
+        :return: imbalance index
+        """
+        bids = bids[:level]
+        asks = asks[:level]
+        exp_factors = np.exp(-alpha * np.arange(level))
+
+        # Calculate imbalance index
+        V_bt = sum(bids * exp_factors[:len(bids)])
+        V_at = sum(asks * exp_factors[:len(asks)])
+        return (V_bt - V_at) / (V_bt + V_at)
+
+
+    def bid_ask_trade(self, current_prices, predicted_prices, price_threshold, product):
+        """
+        Executes trading strategy based on bid-ask prices.
+        :param current_prices:  Tuple of current bid and ask prices
+        :param predicted_prices:  Tuple of predicted bid and ask prices
+        :param price_threshold:  Price threshold for trading
+        :param product:  Product name
+        """
+        predicted_bid, predicted_ask = predicted_prices
+        current_bid, current_ask = current_prices
+
+        # Sell when predicted bid > current bid
+        if predicted_bid > current_bid + self.price_threshold:
+            quantity = self.compute_quantity(product, "sell", predicted_bid)
+            if quantity > 0:
+                self.put_order({"side": "sell", "quantity": quantity, "price": predicted_bid}, product)
+
+        # Buy when predicted ask < current ask
+        if predicted_ask < current_ask - self.price_threshold:
+            quantity = self.compute_quantity(product, "buy", predicted_ask)
+            if quantity > 0:
+                self.put_order({"side": "buy", "quantity": quantity, "price": predicted_ask}, product)
 
     # @abstractmethod
     def handle_market_data(self, message):
