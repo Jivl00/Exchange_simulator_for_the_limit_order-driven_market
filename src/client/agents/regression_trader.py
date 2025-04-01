@@ -6,7 +6,7 @@ from src.client.algorithmic_trader import AlgorithmicTrader
 
 
 class RegressionTrader(AlgorithmicTrader):
-    def __init__(self, name, server, config, base_window_size=10, model_type="linear"):
+    def __init__(self, name, server, config, base_window_size=10, model_type="linear", price_threshold=0.01):
         """
         Initializes the RegressionTrader.
         :param name:  Name of the agent
@@ -14,10 +14,12 @@ class RegressionTrader(AlgorithmicTrader):
         :param config:  Configuration dictionary
         :param base_window_size:  Initial window size
         :param model_type:  Type of regression model to use: "linear", "ridge", "lasso", "bayesian", "random_forest"
+        :param price_threshold:  Price threshold for trading
         """
         super().__init__(name, server, config)
         self.base_window_size = base_window_size
         self.window_size = base_window_size
+        self.price_threshold = price_threshold
         self.prices = {}
         self.volumes = {}
 
@@ -100,13 +102,13 @@ class RegressionTrader(AlgorithmicTrader):
             current_ask = self.prices[product]["ask"][-1]
 
             # Sell when predicted bid > current bid
-            if predicted_bid > current_bid:
+            if predicted_bid > current_bid + self.price_threshold:
                 quantity = self.compute_quantity(product, "sell", predicted_bid)
                 if quantity > 0:
                     self.put_order({"side": "sell", "quantity": quantity, "price": predicted_bid}, product)
 
             # Buy when predicted ask < current ask
-            if predicted_ask < current_ask:
+            if predicted_ask < current_ask - self.price_threshold:
                 quantity = self.compute_quantity(product, "buy", predicted_ask)
                 if quantity > 0:
                     self.put_order({"side": "buy", "quantity": quantity, "price": predicted_ask}, product)
