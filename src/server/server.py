@@ -432,7 +432,12 @@ class WebSocketHandler(tornado.websocket.WebSocketHandler):
         """
         message = {"message": message.decode()}
         for client in cls.clients:
-            client.write_message(message)
+            try:
+                client.write_message(message)
+            except tornado.websocket.WebSocketClosedError:
+                logging.error("Error broadcasting message because of closed connection")
+            except tornado.iostream.StreamClosedError:
+                logging.error("Error broadcasting message because of closed stream")
 
 
 def make_app():
