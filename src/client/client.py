@@ -70,10 +70,17 @@ class Subscriber(ABC):
                 break
             if msg == ">Heartbeat":
                 continue
-            data = json.loads(msg)
-            data["msg_type"] = "MarketDataSnapshot"
-            data = self.protocol.decode(data)
-            self.receive_market_data(data)
+            try:
+                data = json.loads(msg)
+                data["msg_type"] = "MarketDataSnapshot"
+                data = self.protocol.decode(data)
+                self.receive_market_data(data)
+            except json.JSONDecodeError:
+                print(f"Error decoding message: {msg}")
+                continue
+            # except Exception as e:
+            #     print(f"Error fetching data: {e}")
+            #     continue
 
     @abstractmethod
     def receive_market_data(self, data):
