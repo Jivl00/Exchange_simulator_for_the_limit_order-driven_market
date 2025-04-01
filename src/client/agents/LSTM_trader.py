@@ -96,6 +96,14 @@ class DeepLearningTrader(AlgorithmicTrader):
             self.scaler.fit(features)
             self.scaler_fitted = True
 
+        # Add new sample to replay buffer
+        if len(self.prices[product]["bid"]) >= self.window_size:
+            features = self.get_features(product)
+            scaled_features = self.scaler.transform(features)
+            x = torch.tensor(scaled_features[:-1], dtype=torch.float32).unsqueeze(0)
+            y = torch.tensor(scaled_features[-1, :2], dtype=torch.float32)
+            self.replay_buffer.append((x, y))
+
     def get_features(self, product):
         """
         Compute additional features for LSTM input
@@ -145,11 +153,12 @@ class DeepLearningTrader(AlgorithmicTrader):
         if len(self.replay_buffer) < self.window_size + 1:
             return
 
-        batch = np.random.choice(len(self.replay_buffer), 32, replace=False)
+        batch_size = min(32, len(self.replay_buffer))
+        batch = np.random.choice(len(self.replay_buffer), batch_size, replace=False)
         x_batch, y_batch = zip(*[self.replay_buffer[i] for i in batch])
 
-        x_train = torch.tensor(x_batch, dtype=torch.float32)
-        y_train = torch.tensor(y_batch, dtype=torch.float32)
+        x_train = torch.stack(x_batch).squeeze(1)
+        y_train = torch.stack(y_batch)
 
         self.model.train()
         self.optimizer.zero_grad()
