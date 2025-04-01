@@ -297,11 +297,12 @@ def main_page(doc):
                 new_orders['price'].append(order['price'])
                 new_orders['quantity'].append(order['quantity'])
                 new_orders['side'].append(order['side'])
-
-            # Update the data source with the new orders
-            order_source.data = new_orders
         else:
-            order_source.data = {'ID': [None], 'price': [None], 'quantity': [None], 'side': [None]}
+            new_orders = {'ID': [None], 'price': [None], 'quantity': [None], 'side': [None]}
+
+        # Update the data source with the new orders
+        if order_source.data != new_orders:
+            order_source.data = new_orders
 
         start_of_day_price = 100
         change_today = round(((mid_price - start_of_day_price) / start_of_day_price) * 100, 2)
