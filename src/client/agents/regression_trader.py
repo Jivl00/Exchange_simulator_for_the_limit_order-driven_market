@@ -91,20 +91,20 @@ class RegressionTrader(AlgorithmicTrader):
 
         return model.predict(np.array([[len(prices)]]))[0][0]
 
-    def trade(self):
+    def trade(self, message):
         """
         Executes trading strategy - sell when predicted bid > current bid, buy when predicted ask < current ask.
         """
-        for product in self.prices:
-            if len(self.prices[product]["mid"]) < self.window_size:
-                continue
+        product = message["product"]
+        if len(self.prices[product]["mid"]) < self.window_size:
+            return # Not enough data for prediction
 
-            predicted_bid = self.predict_price(self.prices[product]["bid"], self.volumes[product]["bid"])
-            predicted_ask = self.predict_price(self.prices[product]["ask"], self.volumes[product]["ask"])
-            current_bid = self.prices[product]["bid"][-1]
-            current_ask = self.prices[product]["ask"][-1]
+        predicted_bid = self.predict_price(self.prices[product]["bid"], self.volumes[product]["bid"])
+        predicted_ask = self.predict_price(self.prices[product]["ask"], self.volumes[product]["ask"])
+        current_bid = self.prices[product]["bid"][-1]
+        current_ask = self.prices[product]["ask"][-1]
 
-            self.bid_ask_trade((current_bid, current_ask), (predicted_bid, predicted_ask), self.price_threshold, product)
+        self.bid_ask_trade((current_bid, current_ask), (predicted_bid, predicted_ask), self.price_threshold, product)
 
 # Setup and run the RegressionTrader
 config = json.load(open("../config/server_config.json"))

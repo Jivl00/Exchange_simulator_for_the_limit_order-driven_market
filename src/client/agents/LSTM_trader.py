@@ -170,16 +170,16 @@ class DeepLearningTrader(AlgorithmicTrader):
         loss.backward()
         self.optimizer.step()
 
-    def trade(self):
+    def trade(self, message):
         """
         Execute trading strategy based on predicted prices.
         """
-        for product in self.prices:
-            self.train_model()
+        product = message["product"]
+        self.train_model()
 
-            predicted_bid, predicted_ask = self.predict_price(product)
-            current_bid, current_ask = self.prices[product]["bid"][-1], self.prices[product]["ask"][-1]
-            self.bid_ask_trade((current_bid, current_ask), (predicted_bid, predicted_ask), self.price_threshold, product)
+        predicted_bid, predicted_ask = self.predict_price(product)
+        current_bid, current_ask = self.prices[product]["bid"][-1], self.prices[product]["ask"][-1]
+        self.bid_ask_trade((current_bid, current_ask), (predicted_bid, predicted_ask), self.price_threshold, product)
 
 
 

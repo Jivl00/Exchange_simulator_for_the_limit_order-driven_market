@@ -95,31 +95,31 @@ class MomentumTrader(AlgorithmicTrader):
         return 1 if prices[-1] > ema else -1  # Price above/below EMA
 
 
-    def trade(self):
+    def trade(self, message):
         """
         Executes the trading strategy based on the selected metric.
         """
-        for product in self.mid_prices:
-            if len(self.mid_prices[product]) < self.lookback:
-                continue
+        product = message["product"]
+        if len(self.mid_prices[product]) < self.lookback:
+            return # Skip trading if not enough historical data
 
-            momentum = self.metric(self.mid_prices[product])
+        momentum = self.metric(self.mid_prices[product])
 
-            # Calculate volatility
-            volatility = np.std(self.mid_prices[product][-self.lookback:])
+        # Calculate volatility
+        volatility = np.std(self.mid_prices[product][-self.lookback:])
 
-            if volatility > self.volatility_threshold:
-                continue  # Skip trading if volatility is too high
+        if volatility > self.volatility_threshold:
+            return  # Skip trading if volatility is too high
 
-            # Trade based on momentum
-            if momentum > 0:
-                quantity = self.compute_quantity(product, "buy", self.mid_prices[product][-1])
-                if quantity > 0:
-                    self.put_order({"side": "buy", "quantity": quantity, "price": self.mid_prices[product][-1]}, product)
-            elif momentum < 0:
-                quantity = self.compute_quantity(product, "sell", self.mid_prices[product][-1])
-                if quantity > 0:
-                    self.put_order({"side": "sell", "quantity": quantity, "price": self.mid_prices[product][-1]}, product)
+        # Trade based on momentum
+        if momentum > 0:
+            quantity = self.compute_quantity(product, "buy", self.mid_prices[product][-1])
+            if quantity > 0:
+                self.put_order({"side": "buy", "quantity": quantity, "price": self.mid_prices[product][-1]}, product)
+        elif momentum < 0:
+            quantity = self.compute_quantity(product, "sell", self.mid_prices[product][-1])
+            if quantity > 0:
+                self.put_order({"side": "sell", "quantity": quantity, "price": self.mid_prices[product][-1]}, product)
 
 
 # Initialize and run the MomentumTrader

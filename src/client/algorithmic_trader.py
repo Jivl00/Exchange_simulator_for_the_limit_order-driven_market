@@ -24,7 +24,7 @@ class AlgorithmicTrader (Trader):
         """
         self.current_order_book = message["order_book"]
         self.handle_market_data(message)
-        self.trade()
+        self.trade(message)
 
     def put_order(self, order, product):
         """
@@ -78,13 +78,13 @@ class AlgorithmicTrader (Trader):
         current_bid, current_ask = current_prices
 
         # Sell when predicted bid > current bid
-        if predicted_bid > current_bid + self.price_threshold:
+        if predicted_bid > current_bid + price_threshold:
             quantity = self.compute_quantity(product, "sell", predicted_bid)
             if quantity > 0:
                 self.put_order({"side": "sell", "quantity": quantity, "price": predicted_bid}, product)
 
         # Buy when predicted ask < current ask
-        if predicted_ask < current_ask - self.price_threshold:
+        if predicted_ask < current_ask - price_threshold:
             quantity = self.compute_quantity(product, "buy", predicted_ask)
             if quantity > 0:
                 self.put_order({"side": "buy", "quantity": quantity, "price": predicted_ask}, product)
@@ -98,7 +98,7 @@ class AlgorithmicTrader (Trader):
         pass
 
     # @abstractmethod
-    def trade(self):
+    def trade(self, message):
         """
         Executes trading strategy.
         """
