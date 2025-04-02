@@ -464,6 +464,11 @@ def main_page(doc):
             hist_source.data = {'left': [], 'right': [], 'bid_top': [], 'ask_top': []}
             return
 
+        # Calculate the maximum allowed price to avoid badly scaled plots
+        max_allowed_price = df['Price'].shift(1) * 2
+        max_allowed_price.fillna(float('inf'), inplace=True)
+        df = df[df['Price'] <= max_allowed_price]
+
         price_min = df['Price'].min()
         price_max = df['Price'].max()
         price_range = price_max - price_min
