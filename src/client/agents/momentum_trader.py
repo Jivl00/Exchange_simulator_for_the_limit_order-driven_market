@@ -1,43 +1,129 @@
+import pandas as pd
+
 from src.client.algorithmic_trader import AlgorithmicTrader
 import json
-
-# https://chatgpt.com/c/67e4758b-9f70-8005-bab6-89af993b3369
+import numpy as np
 
 class MomentumTrader(AlgorithmicTrader):
-    def __init__(self, name, server, config, lookback=5):
+    def __init__(self, name, server, config, metric, lookback=20, volatility_threshold=0.02):
+        """
+        Initializes the MomentumTrader.
+        :param name: Name of the agent
+        :param server: Server name
+        :param config: Configuration dictionary
+        :param metric: Metric to use for momentum calculation: "percentage_change", "RSI", "SMA", "EMA"
+        :param lookback: Number of historical prices to consider - base your choice on the selected metric
+        :param volatility_threshold: Threshold for volatility to avoid trading
+        """
         super().__init__(name, server, config)
+        self.metric = self.select_metric(metric)
         self.lookback = lookback
-        self.momentum = {}
+        self.volatility_threshold = volatility_threshold
+        self.mid_prices = {}
+
+    def select_metric(self, metric):
+        """
+        Select the metric function based on the provided metric name.
+        :param metric: Metric name
+        :return: Corresponding metric function or default to percentage change
+        """
+        metrics = {
+            "percentage_change": self.compute_percentage_change,
+            "RSI": self.compute_RSI,
+            "SMA": self.compute_SMA,
+            "EMA": self.compute_EMA
+        }
+        return metrics.get(metric, self.compute_percentage_change)  # Default to percentage change
 
     def handle_market_data(self, message):
+        """
+        Handles incoming market data.
+        :param message: Market data message - dictionary with keys "product", "order_book"
+        """
         product = message["product"]
-        if product not in self.momentum:
-            self.momentum[product] = []
-        if self.current_mid_price[product]:
-            self.momentum[product].append(self.current_mid_price[product])
-        if len(self.momentum[product]) > self.lookback:
-            self.momentum[product] = self.momentum[product][1:]
-        print(self.user_balance(product, verbose=False)["current_balance"])
-        self.delete_dispensable_orders(product, self.current_mid_price[product], 1, 60)
+
+        # Initialize data structures for the product if not already
+        if product not in self.mid_prices:
+            self.mid_prices[product] = []
+
+        if mid_price := self.mid_price():
+            self.mid_prices[product].append(mid_price)
+            self.mid_prices[product] = self.mid_prices[product][-self.lookback:]
+            self.delete_dispensable_orders(product, mid_price, 1, 60)
+
+    @staticmethod
+    def compute_percentage_change(prices):
+        """
+        Compute the percentage change between the first and last prices.
+        :param prices: List of historical prices
+        :return: Signal value based on percentage change - positive for increase, negative for decrease
+        """
+        return (prices[-1] - prices[0]) / prices[0] * 100 # Percentage change
+
+    @staticmethod
+    def compute_RSI(prices):
+        """
+        Compute the Relative Strength Index (RSI) based on historical prices.
+        :param prices: List of historical prices
+        :return: Signal value based on RSI - positive for overbought, negative for oversold
+        """
+        deltas = np.diff(prices)
+        gain = np.mean(deltas[deltas > 0]) if any(deltas > 0) else 0
+        loss = np.mean(-deltas[deltas < 0]) if any(deltas < 0) else 1  # Prevent division by zero
+        rs = gain / loss if loss != 0 else float('inf')
+        rsi = 100 - (100 / (1 + rs))
+        return -1 if rsi > 70 else 1 if rsi < 30 else 0  # Overbought, oversold, neutral
+
+    @staticmethod
+    def compute_SMA(prices):
+        """
+        Compute the Simple Moving Average (SMA) based on historical prices.
+        :param prices: List of historical prices
+        :return: Signal value based on SMA - positive for price above SMA, negative for price below SMA
+        """
+        sma = np.mean(prices)
+        return 1 if prices[-1] > sma else -1  # Price above/below SMA
+
+    @staticmethod
+    def compute_EMA(prices):
+        """
+        Compute the Exponential Moving Average (EMA) based on historical prices.
+        :param prices: List of historical prices
+        :return: Signal value based on EMA - positive for price above EMA, negative for price below EMA
+        """
+        ema =  pd.Series(prices).ewm(alpha=0.6, adjust=False).mean().iloc[-1]
+        return 1 if prices[-1] > ema else -1  # Price above/below EMA
+
 
     def trade(self):
-        for product in self.momentum:
-            if len(self.momentum[product]) < self.lookback:
+        """
+        Executes the trading strategy based on the selected metric.
+        """
+        for product in self.mid_prices:
+            if len(self.mid_prices[product]) < self.lookback:
                 continue
-            if self.current_mid_price[product] is None:
-                continue
-            price_change = self.momentum[product][-1] - self.momentum[product][0]
-            if price_change > 0: # Buy
-                quantity = self.compute_quantity(product, "buy", self.current_mid_price[product])
-                if quantity > 0:
-                    self.put_order({"side": "buy", "quantity": quantity, "price": self.current_mid_price[product]}, product)
-            elif price_change < 0: # Sell
-                quantity = self.compute_quantity(product, "sell", self.current_mid_price[product])
-                if quantity > 0:
-                    self.put_order({"side": "sell", "quantity": quantity, "price": self.current_mid_price[product]}, product)
 
+            momentum = self.metric(self.mid_prices[product])
+
+            # Calculate volatility
+            volatility = np.std(self.mid_prices[product][-self.lookback:])
+
+            if volatility > self.volatility_threshold:
+                continue  # Skip trading if volatility is too high
+
+            # Trade based on momentum
+            if momentum > 0:
+                quantity = self.compute_quantity(product, "buy", self.mid_prices[product][-1])
+                if quantity > 0:
+                    self.put_order({"side": "buy", "quantity": quantity, "price": self.mid_prices[product][-1]}, product)
+            elif momentum < 0:
+                quantity = self.compute_quantity(product, "sell", self.mid_prices[product][-1])
+                if quantity > 0:
+                    self.put_order({"side": "sell", "quantity": quantity, "price": self.mid_prices[product][-1]}, product)
+
+
+# Initialize and run the MomentumTrader
 config = json.load(open("../config/server_config.json"))
-momentum_trader = MomentumTrader("momentum_trader", "server", config)
-momentum_trader.register(1000)
+momentum_trader = MomentumTrader("momentum_trader", "server", config, "percentage_change")
+momentum_trader.register(10000)
 momentum_trader.start_subscribe()
-
