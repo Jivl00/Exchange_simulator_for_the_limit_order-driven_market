@@ -371,7 +371,7 @@ def main_page(doc):
                 'bid_price': [bid_price],
                 'ask_price': [ask_price],
             }
-            price_source.stream(new_data, rollover=50)
+            price_source.stream(new_data, rollover=5000)
         return mid_price, imbalance
 
     def add_notification(message, color):
