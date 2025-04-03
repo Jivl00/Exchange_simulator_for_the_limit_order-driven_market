@@ -362,8 +362,6 @@ class Trader (Subscriber, ABC):
 
         if aggregated:
             print("Aggregated order book:")
-            print("Bids DataFrame columns:", bids_df.columns)
-            print("Asks DataFrame columns:", asks_df.columns)
 
             # Aggregate the order book
             if not bids_df.empty:
