@@ -46,14 +46,18 @@ class RegressionTrader(AlgorithmicTrader):
         :param message: Market data message - dictionary with keys "product", "order_book"
         """
         product = message["product"]
-        bid_price = message["order_book"]["Bids"][0]["Price"]
-        ask_price = message["order_book"]["Asks"][0]["Price"]
-        bid_volume = message["order_book"]["Bids"][0]["Quantity"]
-        ask_volume = message["order_book"]["Asks"][0]["Quantity"]
-
+        order_book = message["order_book"]
         if product not in self.prices:
             self.prices[product] = {"mid": [], "bid": [], "ask": []}
             self.volumes[product] = {"bid": [], "ask": []}
+
+        if not order_book["Bids"] or not order_book["Asks"]:
+            return
+        bid_price = order_book["Bids"][0]["Price"]
+        ask_price = order_book["Asks"][0]["Price"]
+        bid_volume = order_book["Bids"][0]["Quantity"]
+        ask_volume = order_book["Asks"][0]["Quantity"]
+
         if mid_price := self.mid_price():
             self.prices[product]["mid"].append(mid_price)
             self.prices[product]["bid"].append(bid_price)

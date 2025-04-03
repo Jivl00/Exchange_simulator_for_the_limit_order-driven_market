@@ -79,19 +79,23 @@ class SwingTrader(AlgorithmicTrader):
         high = max(prices[-self.lookback:])
         low = min(prices[-self.lookback:])
         fib_levels = self.compute_fibonacci_levels(high, low)
-        bids_df = pd.DataFrame(message["order_book"]["Bids"])
-        asks_df = pd.DataFrame(message["order_book"]["Asks"])
+
+        bids = message["order_book"]["Bids"]
+        asks = message["order_book"]["Asks"]
+        if not bids or 'Quantity' not in bids[0] or not asks or 'Quantity' not in asks[0]:
+            return
+
+        bids_df = pd.DataFrame(bids)
+        asks_df = pd.DataFrame(asks)
         imbalance_index = self.imbalance_index(asks_df['Quantity'].values, bids_df['Quantity'].values)
 
         # Trade logic
         mid_price = prices[-1]
-        # if mid_price < lower_band and imbalance_index < -0.2 and mid_price < fib_levels["38.2%"]:
-        if mid_price < lower_band and mid_price < fib_levels["38.2%"]:
+        if mid_price < lower_band and imbalance_index < -0.2 and mid_price < fib_levels["38.2%"]:
             quantity = self.compute_quantity(product, "buy", mid_price)
             if quantity > 0:
                 self.put_order({"type": "limit", "side": "buy", "quantity": quantity, "price": mid_price}, product)
-        # elif mid_price > upper_band and imbalance_index > 0.2 and mid_price > fib_levels["61.8%"]:
-        elif mid_price > upper_band and mid_price > fib_levels["61.8%"]:
+        elif mid_price > upper_band and imbalance_index > 0.2 and mid_price > fib_levels["61.8%"]:
             quantity = self.compute_quantity(product, "sell", mid_price)
             if quantity > 0:
                 self.put_order({"type": "limit", "side": "sell", "quantity": quantity, "price": mid_price}, product)
