@@ -32,8 +32,8 @@ class AlgorithmicTrader (Trader):
         :param order:  Order dictionary
         :param product:  Product name
         """
-        super().put_order(order, product)
         print(f"Placing order: {order} for product: {product}")
+        return super().put_order(order, product)
 
     def mid_price(self):
         """

@@ -8,6 +8,12 @@ class TradingProductManager:
         self.historical_order_books = {product: [] for product in products}
         self.matching_engines = {product: FIFOMatchingEngine(self.order_books[product]) for product in products}
 
+    def set_order_book(self, product, order_book):
+        if product not in self.order_books:
+            raise ValueError(f"Product {product} not found")
+        self.order_books[product] = order_book
+        self.matching_engines[product] = FIFOMatchingEngine(order_book)
+
     def get_order_book(self, product, save_history=True, timestamp=None):
         if save_history and timestamp is None:
             raise ValueError("Timestamp must be provided if save_history is True")

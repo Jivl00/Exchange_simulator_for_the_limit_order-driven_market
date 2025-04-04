@@ -1,23 +1,27 @@
 import os
 import sys
+
 sys.path.append(os.path.join(os.path.dirname(__file__), '../..'))
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
-
+import glob
+import signal
 import traceback
-import atexit
 import pickle
 import tornado.ioloop
 import tornado.web
 import tornado.websocket
+from tornado import httpserver
 import json
 import logging
 import colorlog
 import time
 import uuid
+import argparse
 
 from src.order_book.product_manager import TradingProductManager
 from src.server.user_manager import UserManager
 from src.order_book.order import Order
+from src.order_book.order_book import OrderBook
 from src.protocols.FIXProtocol import FIXProtocol
 
 # Configure logging to use colorlog
@@ -40,13 +44,12 @@ MSG_SEQ_NUM = 0
 ID = 0
 
 # Initialize order books and matching engines for multiple products
-products = ["product1", "product2"]  # Add more products as needed
-products = ["product1"]  # Add more products as needed
+products = config["PRODUCTS"]
 
 # Trading fees, values taken from https://www.investopedia.com/terms/b/brokerage-fee.asp
-fixed_fee=0.01
-percentage_fee=0.001
-per_share_fee=0.005
+fixed_fee = 0.01
+percentage_fee = 0.001
+per_share_fee = 0.005
 
 product_manager = TradingProductManager(products)
 user_manager = UserManager()
@@ -115,6 +118,7 @@ class MsgHandler(tornado.web.RequestHandler):
             return
         logging.debug(f"S> {response}")
         self.write({"message": response.decode()})
+
     @staticmethod
     def update_user_post_buy_budget(user_ID):
         """
@@ -142,7 +146,9 @@ class MsgHandler(tornado.web.RequestHandler):
         # Get all sell orders of the user and update the post-sell volume
         sell_orders_volume = sum(order.quantity for order in product_manager.get_order_book(product, False)
                                  .get_orders_by_user(user_ID) if order.side == "sell")
-        product_manager.get_order_book(product, False).user_balance[user_ID]["post_sell_volume"] = volume - sell_orders_volume
+        product_manager.get_order_book(product, False).user_balance[user_ID][
+            "post_sell_volume"] = volume - sell_orders_volume
+
 
 class TradingHandler(MsgHandler):
     @staticmethod
@@ -170,7 +176,8 @@ class TradingHandler(MsgHandler):
             order_book = product_manager.get_order_book(product, False)
             order_book.modify_user_balance(user, 0, volume[product] if isinstance(volume, dict) else volume)
             user_manager.set_user_budget(user, budget)
-        user_balance = {product: product_manager.get_order_book(product, False).user_balance[user] for product in products}
+        user_balance = {product: product_manager.get_order_book(product, False).user_balance[user]
+                        for product in products}
         return protocol.encode({"user_balance": user_balance, "msg_type": "UserBalance"})
 
     @staticmethod
@@ -195,13 +202,15 @@ class TradingHandler(MsgHandler):
         # If the order is a buy order, check if the user has enough budget to place the order
         if message["order"]["side"] == "buy":
             TradingHandler.update_user_post_buy_budget(message["order"]["user"])
-            if user_manager.users[message["order"]["user"]].post_buy_budget < message["order"]["quantity"] * message["order"]["price"]:
+            if user_manager.users[message["order"]["user"]].post_buy_budget < message["order"]["quantity"] * \
+                    message["order"]["price"]:
                 return protocol.encode({"order_id": -1, "status": False, "msg_type": "ExecutionReport"})
 
         # If the order is a sell order, check if the user has enough shares to sell
         if message["order"]["side"] == "sell":
             TradingHandler.update_user_post_sell_volume(message["order"]["user"], product)
-            user_shares = product_manager.get_order_book(product, False).user_balance[message["user"]]["post_sell_volume"]
+            user_shares = product_manager.get_order_book(product, False).user_balance[message["user"]][
+                "post_sell_volume"]
             if user_shares < message["order"]["quantity"]:
                 return protocol.encode({"order_id": -1, "status": False, "msg_type": "ExecutionReport"})
 
@@ -218,7 +227,7 @@ class TradingHandler(MsgHandler):
         status = product_manager.get_matching_engine(product, timestamp).match_order(order)  # Match order
         protocol.set_target(message["order"]["user"])  # Set target to user
         response = protocol.encode({"order_id": order.id, "status": status, "msg_type": "ExecutionReport"})
-        if status is not False: # If the order was added to the order book or fully matched -> apply trading fee
+        if status is not False:  # If the order was added to the order book or fully matched -> apply trading fee
             percentage_based_fee = order.price * percentage_fee
             per_share_based_fee = order.quantity * per_share_fee
             total_fee = fixed_fee + percentage_based_fee + per_share_based_fee
@@ -245,7 +254,7 @@ class TradingHandler(MsgHandler):
         order = product_manager.get_order_book(product, False).get_order_by_id(order_id)
         if order is None:
             return protocol.encode({"order_id": order_id, "status": False, "msg_type": "ExecutionReportCancel"})
-        if order.user != message["user"]: # Check if the user is the owner of the order
+        if order.user != message["user"]:  # Check if the user is the owner of the order
             return protocol.encode({"order_id": order_id, "status": False, "msg_type": "ExecutionReportCancel"})
         product_manager.get_order_book(product, timestamp=time.time_ns()).delete_order(order_id)
         protocol.set_target(order.user)
@@ -448,7 +457,38 @@ def make_app():
         (r"/websocket", WebSocketHandler),
     ], debug=True, autoreload=True)
 
+
+def load_data():
+    """
+    Loads the last saved server data from a pickle file.
+    """
+    global ID
+    try:
+        # Find the latest pickle file in the data directory
+        list_of_files = glob.glob('../data/*-server_data.pickle')
+        latest_file = max(list_of_files, key=os.path.getctime)
+
+        with open(latest_file, 'rb') as f:
+            data = pickle.load(f)
+
+        # Restore product manager and user manager states
+        for product, product_data in data.items():
+            order_book_obj = OrderBook()
+            order_book = product_data["order_books"][-1]
+            order_book, max_id = order_book_obj.from_JSON(order_book)
+            product_manager.set_order_book(product, order_book)
+            ID = max(ID, max_id) + 1
+
+            user_manager.users = data[product]["users"]
+        print("Data successfully loaded from", latest_file)
+    except Exception as e:
+        print("Error loading data:", e)
+
+
 def save_data():
+    """
+    Saves the current server data to a pickle file.
+    """
     data_to_save = {}
     for product in products:
         report = product_manager.get_historical_order_books(product, -1)
@@ -458,11 +498,50 @@ def save_data():
     with open(file_name, 'wb') as f:
         pickle.dump(data_to_save, f)
 
-# Register the save_data function to be called at exit
-atexit.register(save_data)
+
+def shutdown_server(server):
+    """
+    Handles server shutdown signals and saves the server data.
+    :param server: Tornado server instance
+    """
+    io_loop = tornado.ioloop.IOLoop.current()
+
+    def stop_handler(signum, frame):
+        """
+        Handles the shutdown signal and saves the server data.
+        :param signum: Signal number
+        :param frame: Current stack frame
+        """
+        def shutdown():
+            print("Shutting down server...")
+            save_data()
+
+            # Stop accepting new connections
+            server.stop()
+
+            print("Shutdown complete, data saved.")
+            io_loop.stop()
+
+        io_loop.add_callback(shutdown)
+
+    if sys.platform != "win32":
+        signal.signal(signal.SIGQUIT, stop_handler)
+    signal.signal(signal.SIGTERM, stop_handler)
+    signal.signal(signal.SIGINT, stop_handler)
+
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Trading server")
+    parser.add_argument('-l', '--load', action='store_true', help="Load the server data from the last checkpoint")
+    args = parser.parse_args()
+
+    if args.load:
+        load_data()
+
     app = make_app()
+    app = httpserver.HTTPServer(app)
     app.listen(config["PORT"])
+
     print(f"Server started on {config['HOST']}:{config['PORT']}")
+    shutdown_server(app)
     tornado.ioloop.IOLoop.current().start()

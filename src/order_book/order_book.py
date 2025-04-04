@@ -6,6 +6,8 @@ from sortedcontainers import SortedDict
 import logging
 import copy
 
+from order_book.order import Order
+
 
 class OrderBook:
     """
@@ -26,7 +28,7 @@ class OrderBook:
         }
 
         self.user_balance = defaultdict(lambda: {'balance': 0, 'volume': 0, 'post_sell_volume': 0})
-        self.timestamp = 0 # Timestamp in which the order book was last saved
+        self.timestamp = 0  # Timestamp in which the order book was last saved
 
     def copy(self):
         return copy.deepcopy(self)
@@ -194,7 +196,7 @@ class OrderBook:
         elif side == 'sell':
             self.user_balance[user_id]['balance'] += amount
             self.user_balance[user_id]['volume'] -= volume
-        else: # No side specified
+        else:  # No side specified
             self.user_balance[user_id]['balance'] += amount
             self.user_balance[user_id]['volume'] += volume
             self.user_balance[user_id]['post_sell_volume'] += post_sell_volume
@@ -238,13 +240,7 @@ class OrderBook:
         :param user_id: User ID
         :return: Balance of the user
         """
-        return self.user_balance.get(user_id, {'balance': 0, 'volume': 0}) # Return 0 if user not found
-
-    """
-    -------------------------------
-    All display methods below are for non-aggregated order book display.
-    -------------------------------
-    """
+        return self.user_balance.get(user_id, {'balance': 0, 'volume': 0})  # Return 0 if user not found
 
     def jsonify_order_book(self, depth=-1):
         """
@@ -278,16 +274,34 @@ class OrderBook:
 
         return json.dumps(order_book_data)
 
+    def from_JSON(self, order_book_data):
+        """
+        Convert JSON string to order book object.
+        :param order_book_data: JSON string of the order book
+        :return: OrderBook object, maximum order ID
+        """
+        order_book = json.loads(order_book_data)
+        self.user_balance = defaultdict(lambda: {'balance': 0, 'volume': 0, 'post_sell_volume': 0},
+                                        order_book['UserBalance'])
+        self.timestamp = order_book['Timestamp']
+        max_id = 0
 
-"""
--------------------------------
-Might be useful for debugging
--------------------------------
-"""
+        for bid in order_book['Bids']:
+            max_id = max(max_id, int(bid['ID']))
+            order = Order(bid['ID'], self.timestamp, bid['User'], 'buy', bid['Quantity'], bid['Price'])
+            self.add_order(order)
+        for ask in order_book['Asks']:
+            max_id = max(max_id, int(ask['ID']))
+            order = Order(ask['ID'], self.timestamp, ask['User'], 'sell', ask['Quantity'], ask['Price'])
+            self.add_order(order)
+
+        return self, max_id
 
 
-def display_order_book(self):
-    """Display the order book."""
+def __str__(self):
+    """
+    Return a string representation of the order book.
+    """
     bids_df = pd.DataFrame(columns=['ID', 'User', 'Quantity', 'Price'])
     asks_df = pd.DataFrame(columns=['ID', 'User', 'Quantity', 'Price'])
     for price, orders in self.bids.items():
@@ -304,6 +318,4 @@ def display_order_book(self):
     # Concatenate bids and asks DataFrames side by side
     order_book_df = pd.concat([bids_df, asks_df], axis=1, keys=['Bids', 'Asks'])
 
-    # Print the concatenated DataFrame
-    # print(order_book_df.fillna('').to_markdown(index=False))
-    print(order_book_df.fillna('').to_string(index=False))
+    return order_book_df.fillna('').to_string(index=False)
