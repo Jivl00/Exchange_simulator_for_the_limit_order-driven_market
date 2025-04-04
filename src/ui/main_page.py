@@ -1,7 +1,7 @@
 import json
 import logging
 import time
-
+import threading
 import numpy as np
 import pandas as pd
 import datetime
@@ -11,8 +11,8 @@ import sys
 
 sys.path.append(os.path.join(os.path.dirname(__file__), '../..'))
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
+from bokeh.application import Application
 from bokeh.server.server import Server
-from bokeh.application import Application as BkApplication
 from bokeh.application.handlers.function import FunctionHandler
 from bokeh.models import DatetimeTickFormatter
 from bokeh.plotting import figure
@@ -592,29 +592,132 @@ def main_page(doc):
     doc.add_periodic_callback(update_popup, 500)
 
 
+class User:
+    def __init__(self, username, password):
+        self.username = username
+        self.password_hash = password  # TODO: Hash the password (bcrypt probably)
+
+    def check_password(self, password):
+        return self.password_hash == password
+
+
+# Simple in-memory user store  # TODO: Use a database for storing users
+users = {"asdf@asdf": User("asdf@asdf", "asdf")}
+
+
+class MainHandler(tornado.web.RequestHandler):
+    def get(self):
+        if self.get_secure_cookie("user"):
+            # Redirect to the Bokeh app or include the iframe to show it.
+            self.render("index.html")  # Render a page with the embedded Bokeh app
+        else:
+            self.redirect("/login")
+
+
+class LoginHandler(tornado.web.RequestHandler):
+    def get(self):
+        # If there's an error message, pass it to the template
+        error_message = self.get_argument("error", "")
+        self.render("login.html", error_message=error_message)
+
+    def post(self):
+        username = self.get_argument("username", "")
+        password = self.get_argument("password", "")
+
+        print(f"username: {username}, password: {password}")
+
+        # Check if username exists
+        if username not in users:
+            # Redirect with an error message to the login page
+            self.redirect("/login?error=User not found!")
+            return
+
+        # Check if the username is a valid email
+        if "@" not in username:  # WHAT A CRAZY EMAIL REGEX, right?
+            self.redirect("/login?error=Invalid email address!")
+            return
+
+        # Check if the password matches
+        if not users[username].check_password(password):
+            # Redirect with an error message to the login page
+            self.redirect("/login?error=Incorrect password!")
+            return
+
+        # Redirect to dashboard or home page after successful login
+        self.set_secure_cookie("user", username)
+        self.redirect("/")
+
+
+class RegisterHandler(tornado.web.RequestHandler):
+    def get(self):
+        # If there's an error message, pass it to the template
+        error_message = self.get_argument("error", "")
+        self.render("register.html", error_message=error_message)
+
+    def post(self):
+        username = self.get_argument("username", "")
+        password = self.get_argument("password", "")
+        confirm_password = self.get_argument("confirm_password", "")
+
+        print(f"username: {username}, password: {password}, confirm_password: {confirm_password}")
+
+        # Check if the username is a valid email
+        if "@" not in username:  # WHAT A CRAZY EMAIL REGEX, right?
+            self.redirect("/register?error=Invalid email address!")
+            return
+
+        # Check if the username is already taken
+        if username in users:
+            self.redirect("/register?error=Email already registered!")
+            return
+
+        # Check if the passwords match
+        if password != confirm_password:
+            self.redirect("/register?error=Passwords do not match!")
+            return
+
+        # Create a new user and save it
+        users[username] = User(username, password)
+        self.redirect("/login")
+
+
+class LogoutHandler(tornado.web.RequestHandler):
+    def get(self):
+        self.clear_cookie("user")
+        self.redirect("/login")
+
+
 def make_app():
     """
     Create a Tornado web application with a Bokeh server application.
     :return: Tornado web application
     """
+    cookie_secret = os.urandom(32)
     tornado_app = tornado.web.Application([
-        (r"/", main_page),
-    ], debug=True, autoreload=True)
-
-    # Configure Bokeh Server
-    bokeh_app = BkApplication(FunctionHandler(main_page))
-    viz_port = int(config["VIZ_PORT"])
-    server = Server({'/': bokeh_app},
-                    io_loop=tornado.ioloop.IOLoop.current(),
-                    allow_websocket_origin=[f"{config['HOST'].replace('http://', '')}:{viz_port}"],
-                    port=viz_port)
-    server.start()
-
+        (r"/", MainHandler),
+        (r"/login", LoginHandler),
+        (r"/register", RegisterHandler),
+        (r"/logout", LogoutHandler),
+    ], debug=True, autoreload=True, cookie_secret=cookie_secret)
     return tornado_app
+
+
+def bk_worker():
+    bokeh_app = Application(FunctionHandler(main_page))
+    server = Server(
+        {'/bokeh': bokeh_app},
+        allow_websocket_origin=[f"{config['HOST'].replace('http://', '')}:{config['VIZ_PORT']}",
+                                f"{config['HOST'].replace('http://', '')}:5006"],
+        port=5006,
+    )
+    server.start()
+    server.io_loop.start()
 
 
 if __name__ == "__main__":
     app = make_app()
-    app.listen(0)
+    app.listen(config['VIZ_PORT'])
     print(f"Website running on {config['HOST']}:{config['VIZ_PORT']}")
+
+    threading.Thread(target=bk_worker).start()
     tornado.ioloop.IOLoop.current().start()

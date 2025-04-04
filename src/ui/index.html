@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <title>StackUnderflow Stocks</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css">
+    <script src="https://cdn.bokeh.org/bokeh/release/bokeh-3.7.0.min.js"></script>
+    <script src="https://cdn.bokeh.org/bokeh/release/bokeh-widgets-3.7.0.min.js"></script>
+    <script src="https://cdn.bokeh.org/bokeh/release/bokeh-tables-3.7.0.min.js"></script>
+    <script src="https://cdn.bokeh.org/bokeh/release/bokeh-gl-3.7.0.min.js"></script>
+    <link rel="stylesheet" href="https://cdn.bokeh.org/bokeh/release/bokeh-3.7.0.min.css">
+    <style>
+        html,
+        body {
+            height: 100%;
+            margin: 0;
+        }
+
+        iframe {
+            border: none;
+            /* Optional: Removes the iframe border */
+        }
+
+        /* Optional: Styling the logout button */
+        .logout-btn {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            z-index: 1000;
+        }
+    </style>
+</head>
+
+<body>
+    <!-- Logout Button -->
+    <a href="/logout" class="btn btn-danger logout-btn">Logout</a>
+
+    <div class="container-fluid" style="height: 100%; padding: 0;">
+        <!-- Embed the Bokeh app using iframe -->
+        <iframe src="http://127.0.0.1:5006/bokeh" width="100%" height="100%"></iframe>
+    </div>
+</body>
+
+</html>
