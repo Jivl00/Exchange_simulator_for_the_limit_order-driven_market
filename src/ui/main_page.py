@@ -39,6 +39,34 @@ value_style = f"{common_style} color: rgba(0, 0, 0, 1);"
 # Bokeh App Initialization
 # =====================
 def main_page(doc):
+    session_context = doc.session_context
+    user = session_context.request.arguments.get("user", [b"unknown"])[0].decode()
+
+    if user == "unknown":
+        # User is not logged in, redirect to the login page
+        doc.title = "Login Required"
+        doc.clear()
+        
+        # Create a styled message prompting for login
+        login_message = """
+            <h1 style='color: red; text-align: center;'>
+                Please log in to access the trading platform.
+            </h1>
+            <div style='text-align: center;'>
+                <a href='{host}:{port}/login' style='font-size: 18px; color: blue; text-decoration: underline;'>
+                    Click here to Login
+                </a>
+            </div>
+        """.format(host=config['HOST'], port=config['VIZ_PORT'])
+        
+        # Add the message to the document
+        doc.add_root(Div(text=login_message))
+        return
+
+
+    # TODO: do something better with the user
+    print(f"Logged in user: {user}")
+
     # Reinitialize models to ensure they are unique per session
     initial_balance = 10000
     trader = WebTrader("bokeh", "server", config)
@@ -598,7 +626,7 @@ class User:
         self.password_hash = password  # TODO: Hash the password (bcrypt probably)
 
     def check_password(self, password):
-        return self.password_hash == password
+        return self.password_hash == password  # TODO: Compare hashed passwords
 
 
 # Simple in-memory user store  # TODO: Use a database for storing users
@@ -607,9 +635,9 @@ users = {"asdf@asdf": User("asdf@asdf", "asdf")}
 
 class MainHandler(tornado.web.RequestHandler):
     def get(self):
-        if self.get_secure_cookie("user"):
-            # Redirect to the Bokeh app or include the iframe to show it.
-            self.render("index.html")  # Render a page with the embedded Bokeh app
+        user = self.get_secure_cookie("user")
+        if user:
+            self.render("index.html", host=config["HOST"], user=user.decode())
         else:
             self.redirect("/login")
 
