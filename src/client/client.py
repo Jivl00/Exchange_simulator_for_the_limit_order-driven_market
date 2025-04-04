@@ -5,12 +5,20 @@ import sys
 import time
 
 import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 import pandas as pd
 from abc import ABC, abstractmethod
 from tornado.ioloop import IOLoop, PeriodicCallback
 from tornado.websocket import websocket_connect
 from src.protocols.FIXProtocol import FIXProtocol
 
+session = requests.Session()
+retry = Retry(connect=10, backoff_factor=0.5)
+adapter = HTTPAdapter(max_retries=retry)
+
+session.mount('http://', adapter)
+session.mount('https://', adapter)
 
 class Subscriber(ABC):
     """
@@ -139,7 +147,7 @@ class Trader (Subscriber, ABC):
         """
         data = {"budget": budget, "msg_type": "RegisterRequest"}
         message = self.PROTOCOL.encode(data)
-        response = requests.post(f"{self.BASE_URL}/{self.TRADING_SESSION}",
+        response = session.post(f"{self.BASE_URL}/{self.TRADING_SESSION}",
                                  json={"message": message.decode("utf-8"), "msg_type": data["msg_type"]})
         response = self.parse_response(response)
         if response is None:
@@ -161,7 +169,7 @@ class Trader (Subscriber, ABC):
         data = {"ID": ID, "product": product, "msg_type": "OrderStatusRequest"}
         message = self.PROTOCOL.encode(data)
 
-        response = requests.get(f"{self.BASE_URL}/{self.QUOTE_SESSION}",
+        response = session.get(f"{self.BASE_URL}/{self.QUOTE_SESSION}",
                                 json={"message": message.decode("utf-8"), "msg_type": data["msg_type"]})
         response = self.parse_response(response)
         if response is None:
@@ -180,7 +188,7 @@ class Trader (Subscriber, ABC):
         data = {"order": order, "product": product, "msg_type": "NewOrderSingle"}
         message = self.PROTOCOL.encode(data)
 
-        response = requests.post(f"{self.BASE_URL}/{self.TRADING_SESSION}",
+        response = session.post(f"{self.BASE_URL}/{self.TRADING_SESSION}",
                                  json={"message": message.decode("utf-8"), "msg_type": data["msg_type"]})
         response = self.parse_response(response)
         if response is None:
@@ -203,7 +211,7 @@ class Trader (Subscriber, ABC):
         data = {"ID": ID, "product": product, "msg_type": "OrderCancelRequest"}
         message = self.PROTOCOL.encode(data)
 
-        response = requests.post(f"{self.BASE_URL}/{self.TRADING_SESSION}",
+        response = session.post(f"{self.BASE_URL}/{self.TRADING_SESSION}",
                                  json={"message": message.decode("utf-8"), "msg_type": data["msg_type"]})
         response = self.parse_response(response)
         if response is None:
@@ -222,7 +230,7 @@ class Trader (Subscriber, ABC):
         """
         data = {"ID": ID, "quantity": quantity, "product": product, "msg_type": "OrderModifyRequestQty"}
         message = self.PROTOCOL.encode(data)
-        response = requests.post(f"{self.BASE_URL}/{self.TRADING_SESSION}",
+        response = session.post(f"{self.BASE_URL}/{self.TRADING_SESSION}",
                                  json={"message": message.decode("utf-8"), "msg_type": data["msg_type"]})
         response = self.parse_response(response)
         if response is None:
@@ -260,7 +268,7 @@ class Trader (Subscriber, ABC):
         """
         data = {"depth": depth, "product": product, "msg_type": "MarketDataRequest"}
         message = self.PROTOCOL.encode(data)
-        response = requests.get(f"{self.BASE_URL}/{self.QUOTE_SESSION}",
+        response = session.get(f"{self.BASE_URL}/{self.QUOTE_SESSION}",
                                 json={"message": message.decode("utf-8"), "msg_type": data["msg_type"]})
         response = self.parse_response(response)
         if response is None:
@@ -279,7 +287,7 @@ class Trader (Subscriber, ABC):
         """
         data = {"product": product, "msg_type": "UserOrderStatusRequest"}
         message = self.PROTOCOL.encode(data)
-        response = requests.get(f"{self.BASE_URL}/{self.QUOTE_SESSION}",
+        response = session.get(f"{self.BASE_URL}/{self.QUOTE_SESSION}",
                                 json={"message": message.decode("utf-8"), "msg_type": data["msg_type"]})
         response = self.parse_response(response)
         if response is None:
@@ -299,7 +307,7 @@ class Trader (Subscriber, ABC):
         """
         data = {"product": product, "msg_type": "UserBalanceRequest"}
         message = self.PROTOCOL.encode(data)
-        response = requests.get(f"{self.BASE_URL}/{self.QUOTE_SESSION}",
+        response = session.get(f"{self.BASE_URL}/{self.QUOTE_SESSION}",
                                 json={"message": message.decode("utf-8"), "msg_type": data["msg_type"]})
         response = self.parse_response(response)
         if response is None:
@@ -320,7 +328,7 @@ class Trader (Subscriber, ABC):
         """
         data = {"product": product, "history_len": history_length, "msg_type": "CaptureReportRequest"}
         message = self.PROTOCOL.encode(data)
-        response = requests.get(f"{self.BASE_URL}/{self.QUOTE_SESSION}",
+        response = session.get(f"{self.BASE_URL}/{self.QUOTE_SESSION}",
                                 json={"message": message.decode("utf-8"), "msg_type": data["msg_type"]})
         response = self.parse_response(response)
         if response is None:
@@ -408,10 +416,7 @@ class Trader (Subscriber, ABC):
         if not available_volume.empty: # Aggregated order book
             available_volume = available_volume.groupby('Price', as_index=False).agg(
                 {'Quantity': 'sum', 'ID': 'count', 'User': 'first'})
-            if len(available_volume) >= 3:
-                available_volume = sum(available_volume['Quantity'][:3])  # Top 3 levels
-            else:
-                available_volume = available_volume['Quantity'][0]  # Top of the book
+            available_volume = sum(available_volume['Quantity'][:min(10, len(available_volume))])
         else:
             available_volume = 0
         if price != 0:
@@ -464,7 +469,7 @@ class AdminTrader(Trader, ABC):
         """
         data = {"budget": budget, "volume": volume, "msg_type": "InitializeLiquidityEngine"}
         message = self.PROTOCOL.encode(data)
-        response = requests.post(f"{self.BASE_URL}/{self.TRADING_SESSION}",
+        response = session.post(f"{self.BASE_URL}/{self.TRADING_SESSION}",
                                  json={"message": message.decode("utf-8"), "msg_type": data["msg_type"]})
         response = self.parse_response(response)
         if response is None:

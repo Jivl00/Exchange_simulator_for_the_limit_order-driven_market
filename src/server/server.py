@@ -1,3 +1,4 @@
+import asyncio
 import os
 import sys
 
@@ -237,7 +238,7 @@ class TradingHandler(MsgHandler):
         broadcast_response = protocol.encode(
             {"order_book": product_manager.get_order_book(product, False).jsonify_order_book(),
              "product": product, "msg_type": "MarketDataSnapshot"})
-        WebSocketHandler.broadcast(broadcast_response)
+        asyncio.ensure_future(WebSocketHandler.broadcast(broadcast_response))
         return response
 
     @staticmethod
@@ -263,7 +264,7 @@ class TradingHandler(MsgHandler):
         broadcast_response = protocol.encode(
             {"order_book": product_manager.get_order_book(product, False).jsonify_order_book(),
              "product": product, "msg_type": "MarketDataSnapshot"})
-        WebSocketHandler.broadcast(broadcast_response)
+        asyncio.ensure_future(WebSocketHandler.broadcast(broadcast_response))
         return protocol.encode({"order_id": order_id, "status": True, "msg_type": "ExecutionReportCancel"})
 
     @staticmethod
@@ -434,19 +435,25 @@ class WebSocketHandler(tornado.websocket.WebSocketHandler):
         # self.write_message(f">{message}")
 
     @classmethod
-    def broadcast(cls, message):
+    async def broadcast(cls, message):
         """
         Broadcasts a message to all subscribed clients.
         :param message: message to broadcast
         """
         message = {"message": message.decode()}
+        closed_clients = set()
         for client in cls.clients:
             try:
-                client.write_message(message)
+                await client.write_message(message)
             except tornado.websocket.WebSocketClosedError:
                 logging.error("Error broadcasting message because of closed connection")
+                closed_clients.add(client)
             except tornado.iostream.StreamClosedError:
                 logging.error("Error broadcasting message because of closed stream")
+                closed_clients.add(client)
+        for client in closed_clients:
+            cls.clients.remove(client)
+            logging.info("WebSocket connection closed during broadcast")
 
 
 def make_app():
