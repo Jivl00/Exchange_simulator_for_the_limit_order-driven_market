@@ -90,7 +90,6 @@ class SpoofingTrader(AlgorithmicTrader):
             for order_id in self.spoof_orders[product]:
                 self.delete_order(order_id, product)
             self.spoof_orders[product] = []
-        self.user_balance(product)
 
 # Initialize and run the SpoofingTrader
 config = json.load(open("../config/server_config.json"))
