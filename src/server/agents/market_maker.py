@@ -8,7 +8,6 @@ import os
 import sys
 sys.path.append(os.path.join(os.path.dirname(__file__), '../../..'))
 from src.client.client import AdminTrader
-from src.server.server import products
 
 logging.getLogger("urllib3").setLevel(logging.WARNING)  # suppress logging
 
@@ -41,11 +40,12 @@ class MarketMaker(AdminTrader, ABC):
         self.window = window
         self.volatility_multiplier = volatility_multiplier
         self.mid_prices = {}
-        self.initial_emission = {product: initial_emission for product in products} \
+        self.products = config["PRODUCTS"]
+        self.initial_emission = {product: initial_emission for product in self.products} \
             if isinstance(initial_emission, int) else initial_emission
-        self.starting_price = {product: starting_price for product in products} \
+        self.starting_price = {product: starting_price for product in self.products} \
             if isinstance(starting_price, int) else starting_price
-        self.initial_num_orders = {product: initial_num_orders for product in products} \
+        self.initial_num_orders = {product: initial_num_orders for product in self.products} \
             if isinstance(initial_num_orders, int) else initial_num_orders
 
         self.initialize_liquidity_engine(budget, volume)
@@ -91,7 +91,7 @@ class MarketMaker(AdminTrader, ABC):
         while True:
             try:
                 time.sleep(1)  # Sleep for 1 second
-                for product in products:
+                for product in self.products:
                     bids, asks = self.get_historical_mid_prices(product)
                     dynamic_spread = self.calculate_dynamic_spread(product)
                     side = None
@@ -120,7 +120,7 @@ class MarketMaker(AdminTrader, ABC):
         Initialize the market by adding initial liquidity.
         :param scale: Scale factor for exponential distribution
         """
-        for product in products:
+        for product in self.products:
             num_orders = self.initial_num_orders[product]
             bid_prices = np.sort(self.starting_price[product] - np.random.exponential(scale * num_orders, num_orders))
             ask_prices = np.sort(self.starting_price[product] + np.random.exponential(scale * num_orders, num_orders))[::-1]

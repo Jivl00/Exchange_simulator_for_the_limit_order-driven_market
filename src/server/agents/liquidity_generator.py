@@ -11,7 +11,6 @@ import numpy as np
 sys.path.append(os.path.join(os.path.dirname(__file__), '../../..'))
 
 from src.client.client import AdminTrader
-from src.server.server import products
 
 logging.getLogger("urllib3").setLevel(logging.WARNING) # Suppress logging
 
@@ -25,6 +24,7 @@ class SyntheticLiquidityProvider(AdminTrader, ABC):
         """
         super().__init__("liquidity_generator", target, config)
         self.initialize_liquidity_engine(10000, 10000)
+        self.products = config["PRODUCTS"]
 
     def receive_market_data(self, data):
         pass
@@ -38,7 +38,7 @@ class SyntheticLiquidityProvider(AdminTrader, ABC):
         while True:
             try:
                 time.sleep(random.randint(1, 5)) # Sleep for 1-5 seconds
-                product = random.choice(products)
+                product = random.choice(self.products)
                 order_book = self.order_book_request(product, depth=10)
                 bid_volume = sum([order["Quantity"] for order in order_book["Bids"]])
                 ask_volume = sum([order["Quantity"] for order in order_book["Asks"]])
