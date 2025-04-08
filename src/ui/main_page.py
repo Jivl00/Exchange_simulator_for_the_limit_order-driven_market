@@ -104,7 +104,7 @@ def main_page(doc):
     # Order Management UI
     # =====================
     title = f"Unique ID for User: {user}"
-    user_id_input = TextInput(title=title, value=user_id, width=300, disabled=True)
+    user_id_input = TextInput(title=title, value=user_id, width=280, disabled=True)
     user_id_input.js_on_change('value', CustomJS(args=dict(input=user_id_input, initial_value=user_id), code="""
         if (window.confirmationShown) {
             window.confirmationShown = false;
@@ -115,6 +115,12 @@ def main_page(doc):
             window.confirmationShown = true;
             input.value = initial_value;
         }
+    """))
+    # <a href="/logout" class="btn btn-danger logout-btn">Logout</a>
+    logout_button = Button(label="Logout", button_type="danger", width=70)
+    logout_button.stylesheets = ["button { margin-top: 18px; }"]
+    logout_button.js_on_click(CustomJS(code=f"""
+        window.location.href = "{config["HOST"]}:{config["VIZ_PORT"]}/logout";
     """))
     price_input = TextInput(title="Price", value="100")
     quantity_input = TextInput(title="Quantity", value="1")
@@ -273,7 +279,7 @@ def main_page(doc):
         title="Active orders",
         width=320,
         height=480,
-        sizing_mode="fixed",
+        sizing_mode="stretch_width",
     )
 
     # =====================
@@ -339,7 +345,7 @@ def main_page(doc):
         change_today = round(((mid_price - start_of_day_price) / start_of_day_price) * 100, 2)
         change_today_color = "green" if change_today >= 0 else "red"
         change_today_background = "#d4edda" if change_today >= 0 else "#f8d7da"
-        change_today = f'<span style="color: {change_today_color};">{change_today}%</span>'
+        change_today = f'<span style="color: {change_today_color};">{change_today}</span>'
 
         data = {
             "Imbalance Index": str(round(imbalance, 2)),
@@ -586,6 +592,10 @@ def main_page(doc):
     send_button.on_click(send_order)
     delete_button.on_click(delete_order)
 
+    controls_width = 390
+    table_width = 315
+    graphs_width = 740
+
     # Layouts
     product_info = GroupBox(
         child=product_info,
@@ -594,7 +604,7 @@ def main_page(doc):
         sizing_mode="stretch_width",
     )
     user_id_group = GroupBox(
-        child=user_id_input,
+        child=row(user_id_input, logout_button),
         title="Login",
         sizing_mode="stretch_width",
     )
@@ -610,7 +620,7 @@ def main_page(doc):
     controls = column(
         user_id_group,
         new_order_group,
-        user_orders_group, width=400, sizing_mode="stretch_height",
+        user_orders_group, width=controls_width, sizing_mode="stretch_height",
     )
     control_box = GroupBox(
         child=controls,
@@ -620,14 +630,61 @@ def main_page(doc):
     info_table_group = GroupBox(
         child=info_table,
         title="Trading Details",
-        sizing_mode="stretch_height",
+        sizing_mode="stretch_both",
         margin=(40, 0, 0, 0),
     )
 
-    table = column(product_info, table_book_group, info_table_group, width=325, sizing_mode="stretch_height")
-    graphs = column(price_fig_group, hist_fig_group, history_table_group, width=750, sizing_mode="stretch_height")
+    table = column(product_info, table_book_group, info_table_group, width=table_width, sizing_mode="stretch_height")
+    graphs = column(price_fig_group, hist_fig_group, history_table_group, width=graphs_width, sizing_mode="stretch_height")
     ui_layout = row(table, graphs, control_box, sizing_mode="stretch_both")
     ui_layout = column(ui_layout, notifications_container, sizing_mode="stretch_both")
+
+    resize_callback = CustomJS(args=dict(
+        controls_width=controls_width,
+        table_width=table_width,
+        graphs_width=graphs_width,
+        controls=controls,
+        table=table,
+        graphs=graphs,
+        ui_layout=ui_layout,  # Pass the entire layout as an argument
+    ), code="""
+        function updateSize() {
+            var padding = 50; // Adjust this value as needed
+            var width = window.innerWidth - padding;
+            var height = window.innerHeight - padding;
+            
+            // Recalculate widths for layout
+            var total_width = controls_width + table_width + graphs_width;
+            width = Math.max(width, total_width); // Ensure the width is at least the total width
+
+            var controls_ratio = controls_width / total_width;
+            var table_ratio = table_width / total_width;
+            var graphs_ratio = graphs_width / total_width;
+
+            // Update control, table, and graph widths based on new window size
+            var controls_screen_width = Math.round(width * controls_ratio);
+            console.log(controls_screen_width);
+            var table_screen_width = Math.round(width * table_ratio);
+            console.log(table_screen_width);
+            var graphs_screen_width = Math.round(width * graphs_ratio);
+            console.log(graphs_screen_width);
+
+            // Apply the new widths to the layout elements
+            controls.width = controls_screen_width;
+            table.width = table_screen_width;
+            graphs.width = graphs_screen_width;
+
+            // Trigger layout update for the entire layout
+            ui_layout.change.emit(); // Trigger layout change
+        }
+
+        // Initial size update on load
+        updateSize();
+
+        // Attach resize event listener
+        window.addEventListener('resize', updateSize);
+    """)
+    doc.on_event('document_ready', resize_callback)
 
     doc.title = "StackUnderflow Stocks"
     # Add to document
