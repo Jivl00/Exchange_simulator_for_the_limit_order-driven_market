@@ -25,3 +25,7 @@ class UserManager:
 
     def user_exists(self, user_ID):
         return user_ID in self.users
+
+    def user_name_exists(self, user_name):
+        user_id = next((user.user_ID for user in self.users.values() if user.name == user_name), None)
+        return user_id

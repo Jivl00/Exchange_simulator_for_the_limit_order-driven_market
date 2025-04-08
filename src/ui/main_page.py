@@ -1,5 +1,7 @@
 import json
 import logging
+import sqlite3
+import bcrypt
 import time
 import threading
 import numpy as np
@@ -34,6 +36,9 @@ common_style = "font-family: 'Arial', sans-serif; font-size: 12px;"
 label_style = f"{common_style} color: rgba(0, 0, 0, 0.5);"
 value_style = f"{common_style} color: rgba(0, 0, 0, 1);"
 
+db_path = os.path.join(os.path.dirname(__file__), "../server/users.db")
+conn = sqlite3.connect(db_path)
+cursor = conn.cursor()
 
 # =====================
 # Bokeh App Initialization
@@ -63,13 +68,9 @@ def main_page(doc):
         doc.add_root(Div(text=login_message))
         return
 
-
-    # TODO: do something better with the user
-    print(f"Logged in user: {user}")
-
     # Reinitialize models to ensure they are unique per session
     initial_balance = 10000
-    trader = WebTrader("bokeh", "server", config)
+    trader = WebTrader(user, "server", config)
     user_id = trader.register(initial_balance)
 
     # Top screen info
@@ -102,7 +103,8 @@ def main_page(doc):
     # =====================
     # Order Management UI
     # =====================
-    user_id_input = TextInput(title="User ID", value=user_id, width=300)
+    title = f"Unique ID for User: {user}"
+    user_id_input = TextInput(title=title, value=user_id, width=300, disabled=True)
     user_id_input.js_on_change('value', CustomJS(args=dict(input=user_id_input, initial_value=user_id), code="""
         if (window.confirmationShown) {
             window.confirmationShown = false;
@@ -114,7 +116,6 @@ def main_page(doc):
             input.value = initial_value;
         }
     """))
-    login_button = Button(label="Login", button_type="success", width=300)
     price_input = TextInput(title="Price", value="100")
     quantity_input = TextInput(title="Quantity", value="1")
     side_selector = RadioButtonGroup(labels=["Buy", "Sell"], active=0)
@@ -571,14 +572,13 @@ def main_page(doc):
             hist_ask_table_source.data = {'ask_price': [], 'ask_quantity': [], 'int_ask_price': [], 'price_pos': [],
                                           'quantity_pos': []}
 
-    login_button.on_click(lambda: trader.PROTOCOL.set_sender(user_id_input.value))
     send_button.on_click(send_order)
     delete_button.on_click(delete_order)
 
     # Layouts
     info_top_row = row(product_info, sizing_mode="stretch_width")
     user_id_group = GroupBox(
-        child=column(user_id_input, login_button),
+        child=user_id_input,
         title="Login",
         sizing_mode="stretch_width",
     )
@@ -620,19 +620,6 @@ def main_page(doc):
     doc.add_periodic_callback(update_popup, 500)
 
 
-class User:
-    def __init__(self, username, password):
-        self.username = username
-        self.password_hash = password  # TODO: Hash the password (bcrypt probably)
-
-    def check_password(self, password):
-        return self.password_hash == password  # TODO: Compare hashed passwords
-
-
-# Simple in-memory user store  # TODO: Use a database for storing users
-users = {"asdf@asdf": User("asdf@asdf", "asdf")}
-
-
 class MainHandler(tornado.web.RequestHandler):
     def get(self):
         user = self.get_secure_cookie("user")
@@ -652,10 +639,9 @@ class LoginHandler(tornado.web.RequestHandler):
         username = self.get_argument("username", "")
         password = self.get_argument("password", "")
 
-        print(f"username: {username}, password: {password}")
-
-        # Check if username exists
-        if username not in users:
+        # Check if username exists in the database
+        cursor.execute("SELECT * FROM users WHERE email=?", (username,))
+        if cursor.fetchone() is None:
             # Redirect with an error message to the login page
             self.redirect("/login?error=User not found!")
             return
@@ -666,8 +652,10 @@ class LoginHandler(tornado.web.RequestHandler):
             return
 
         # Check if the password matches
-        if not users[username].check_password(password):
-            # Redirect with an error message to the login page
+        cursor.execute("SELECT password FROM users WHERE email=?", (username,))
+        result = cursor.fetchone()
+        stored_password = result[0]
+        if not bcrypt.checkpw(password.encode('utf-8'), stored_password.encode('utf-8')): # Redirect with an error message to the login page
             self.redirect("/login?error=Incorrect password!")
             return
 
@@ -687,14 +675,14 @@ class RegisterHandler(tornado.web.RequestHandler):
         password = self.get_argument("password", "")
         confirm_password = self.get_argument("confirm_password", "")
 
-        print(f"username: {username}, password: {password}, confirm_password: {confirm_password}")
-
         # Check if the username is a valid email
         if "@" not in username:  # WHAT A CRAZY EMAIL REGEX, right?
             self.redirect("/register?error=Invalid email address!")
             return
 
         # Check if the username is already taken
+        cursor.execute("SELECT * FROM users WHERE email=?", (username,))
+        users = cursor.fetchall()
         if username in users:
             self.redirect("/register?error=Email already registered!")
             return
@@ -704,8 +692,10 @@ class RegisterHandler(tornado.web.RequestHandler):
             self.redirect("/register?error=Passwords do not match!")
             return
 
-        # Create a new user and save it
-        users[username] = User(username, password)
+        # Create a new user and save it to the database
+        hashed_password = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())
+        cursor.execute("INSERT INTO users (email, password) VALUES (?, ?)", (username, hashed_password.decode('utf-8')))
+        conn.commit()
         self.redirect("/login")
 
 

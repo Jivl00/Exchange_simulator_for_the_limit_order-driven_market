@@ -1,5 +1,6 @@
 import asyncio
 import os
+import sqlite3
 import sys
 
 sys.path.append(os.path.join(os.path.dirname(__file__), '../..'))
@@ -24,6 +25,7 @@ from src.server.user_manager import UserManager
 from src.order_book.order import Order
 from src.order_book.order_book import OrderBook
 from src.protocols.FIXProtocol import FIXProtocol
+from src.server.db_manager import create_user_db
 
 # Configure logging to use colorlog
 handler = logging.StreamHandler()
@@ -54,6 +56,12 @@ per_share_fee = 0.005
 
 product_manager = TradingProductManager(products)
 user_manager = UserManager()
+db_path = "server/users.db"
+if not os.path.exists(db_path):
+    os.makedirs(os.path.dirname(db_path), exist_ok=True)
+create_user_db(db_path)  # Create the database and table if they don't exist
+conn = sqlite3.connect(db_path)
+cursor = conn.cursor()
 protocol = FIXProtocol("server")
 
 
@@ -159,9 +167,20 @@ class TradingHandler(MsgHandler):
         :param message: client message with user budget
         :return: unique user ID
         """
+        user_ID = user_manager.user_name_exists(message["user"])
+        if user_ID:
+            return protocol.encode({"user": user_ID, "msg_type": "RegisterResponse"})  # Return existing user ID
+        if user_manager.user_exists(message["user"]):
+            return protocol.encode({"user": message["user"], "msg_type": "RegisterResponse"}) # Return existing user ID
+
+        # Check if the user is in the database
+        cursor.execute("SELECT * FROM users WHERE email=?", (message["user"],))
+        user = cursor.fetchone()
+        if user is None:
+            raise ValueError("User not found in the database")
         user_ID = str(uuid.uuid4())
         user_manager.add_user(message["user"], user_ID, message["budget"])
-        return protocol.encode({"user": user_ID, "msg_type": "RegisterResponse"})  # Return user ID
+        return protocol.encode({"user": user_ID, "msg_type": "RegisterResponse"})  # Return new user ID
 
     @staticmethod
     def initialize_liq_engine(message):
