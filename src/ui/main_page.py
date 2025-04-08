@@ -74,7 +74,7 @@ def main_page(doc):
     user_id = trader.register(initial_balance)
 
     # Top screen info
-    product_info = Div(text="<h1 style='opacity: 0.5;'>StackUnderflow Stocks</h1>", width=300)
+    product_info = Div(text="<h1 style='opacity: 0.5;'>StackUnderflow Stocks</h1>", width=290)
     info_table = column(
         Div(text=f""),
         sizing_mode="stretch_both"
@@ -128,7 +128,7 @@ def main_page(doc):
         TableColumn(field="quantity", title="Quantity"),
         TableColumn(field="side", title="Side"),
     ]
-    order_table = DataTable(source=order_source, columns=columns, width=365, height=275)
+    order_table = DataTable(source=order_source, columns=columns, width=365, height=276)
     # replace id colum with timestamp
     columns[0] = TableColumn(field="time", title="Timestamp")
     history_table = DataTable(source=history_source, columns=columns, height=200, sizing_mode="stretch_width")
@@ -289,7 +289,7 @@ def main_page(doc):
         local_quantity = user_data["current_balance"]["post_sell_volume"]
 
         balance_text.text = f"""
-                            <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+                            <div style="display: flex; justify-content: space-between;">
                                 <span style="{label_style}">Remaining Balance:</span>
                                 <span style="{value_style}">${local_balance:.2f}</span>
                             </div>
@@ -338,10 +338,10 @@ def main_page(doc):
         start_of_day_price = 100
         change_today = round(((mid_price - start_of_day_price) / start_of_day_price) * 100, 2)
         change_today_color = "green" if change_today >= 0 else "red"
+        change_today_background = "#d4edda" if change_today >= 0 else "#f8d7da"
         change_today = f'<span style="color: {change_today_color};">{change_today}%</span>'
 
         data = {
-            "Change Today": change_today,
             "Imbalance Index": str(round(imbalance, 2)),
             "Order Size Granularity": "1",
             "Order Price Granularity": "0.01",
@@ -350,8 +350,17 @@ def main_page(doc):
         # Updated info_table with title and dynamic values
         nonlocal info_table
         info_table.children[0].text = f"""
-            <div style="border: 1.6px solid rgba(0, 0, 0, 0.1); padding: 10px; width: 290px;">
-                {''.join(f'<div style="display: flex; justify-content: space-between; margin-bottom: 5px;">'
+            <div style="border: 1px solid rgba(0, 0, 0, 0.1); border-radius: 9px;
+                        padding: 15px; background-color: #f9f9f9; width: 290px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; 
+                            border: 1px solid {change_today_color}; border-radius: 5px; 
+                            padding: 10px; background-color: {change_today_background}; margin-bottom: 15px;">
+                    <span style="{label_style}; font-weight: bold;">Change Today:</span>
+                    <span style="{value_style}; font-weight: bold; color: {change_today_color};">
+                        {change_today}%
+                    </span>
+                </div>
+                {''.join(f'<div style="display: flex; justify-content: space-between; margin-bottom: 8px;">'
                          f'<span style="{label_style}">{key}:</span>'
                          f'<span style="{value_style}">{value}</span>'
                          '</div>' for key, value in data.items())}
@@ -578,7 +587,12 @@ def main_page(doc):
     delete_button.on_click(delete_order)
 
     # Layouts
-    info_top_row = row(product_info, sizing_mode="stretch_width")
+    product_info = GroupBox(
+        child=product_info,
+        height=100,
+        margin=(10, 10, 5, 0),
+        sizing_mode="stretch_width",
+    )
     user_id_group = GroupBox(
         child=user_id_input,
         title="Login",
@@ -610,7 +624,7 @@ def main_page(doc):
         margin=(40, 0, 0, 0),
     )
 
-    table = column(info_top_row, table_book_group, info_table_group, width=325, sizing_mode="stretch_height")
+    table = column(product_info, table_book_group, info_table_group, width=325, sizing_mode="stretch_height")
     graphs = column(price_fig_group, hist_fig_group, history_table_group, width=750, sizing_mode="stretch_height")
     ui_layout = row(table, graphs, control_box, sizing_mode="stretch_both")
     ui_layout = column(ui_layout, notifications_container, sizing_mode="stretch_both")
