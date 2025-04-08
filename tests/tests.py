@@ -48,18 +48,22 @@ def configure_test_logging():
     test_logger.addHandler(ch)
 
 class TestAlgorithmicTraderIntegration(unittest.TestCase):
-    server_process = None
-
     @classmethod
     def setUpClass(cls):
         """
-        Start the server and initialize the AlgorithmicTrader for integration tests.
+        Set up the test class by configuring logging.
         """
         configure_test_logging()
+
+    def setUp(self):
+        """
+        Ensure a clean test state before each test.
+        Starts the server and initializes the AlgorithmicTrader and TestAdminTrader.
+        """
         # Start the server using subprocess
         logger.info("Starting the server...")
         try:
-            cls.server_process = subprocess.Popen(
+            self.server_process = subprocess.Popen(
                 [python_path, "..\src\server\server.py"],
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL
@@ -80,29 +84,20 @@ class TestAlgorithmicTraderIntegration(unittest.TestCase):
             if not server_started:
                 raise Exception("Failed to start the server. Exiting...")
 
-            cls.trader = AlgorithmicTrader("TestTrader", "Server1", config)
-            cls.tester = TestAdminTrader("liquidity_generator", "Server1", config)
-            cls.tester.initialize_liquidity_engine(10000, 10000)
+            self.trader = AlgorithmicTrader("test_trader", "Server1", config)
+            self.tester = TestAdminTrader("liquidity_generator", "Server1", config)
+            self.tester.initialize_liquidity_engine(10000, 10000)
             logger.info("Server started and AlgorithmicTrader initialized.")
         except Exception as e:
             logger.error(f"Error starting the server: {e}")
-            cls.tearDownClass()
             raise
 
-    @classmethod
-    def tearDownClass(cls):
+    def tearDown(self):
         """
-        Terminate the server after tests are complete
+        Ensure the server is stopped after each test.
         """
-        logger.info("Shutting down the server...")
-        cls.server_process.terminate()
-        cls.server_process.wait()
-
-    def setUp(self):
-        """
-        Ensure a clean test state before each test.
-        """
-        self.addCleanup(self.clean_up)
+        self.server_process.terminate()
+        self.server_process.wait()
 
     def register_user(self, budget):
         """
@@ -111,19 +106,6 @@ class TestAlgorithmicTraderIntegration(unittest.TestCase):
         user_id = self.trader.register(budget)
         self.assertIsNotNone(user_id, "User registration failed.")
         return user_id
-
-    def clean_up(self):
-        """
-        Clean up by removing all orders from the trader and tester after each test.
-        """
-        logger.info("Cleaning up user orders...")
-        for trader in [self.trader, self.tester]:
-            try:
-                all_orders = trader.list_user_orders("product1")
-                for order_id in all_orders:
-                    trader.delete_order(order_id, "product1")
-            except Exception as e:
-                logger.error(f"Error during cleanup: {e}")
 
     def test_basic_order_flow(self):
         """
