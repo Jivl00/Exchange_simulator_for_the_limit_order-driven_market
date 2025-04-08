@@ -128,7 +128,7 @@ def main_page(doc):
         TableColumn(field="quantity", title="Quantity"),
         TableColumn(field="side", title="Side"),
     ]
-    order_table = DataTable(source=order_source, columns=columns, width=365, height=250)
+    order_table = DataTable(source=order_source, columns=columns, width=365, height=275)
     # replace id colum with timestamp
     columns[0] = TableColumn(field="time", title="Timestamp")
     history_table = DataTable(source=history_source, columns=columns, height=200, sizing_mode="stretch_width")
@@ -145,7 +145,7 @@ def main_page(doc):
     # --------------------------------
     price_fig = figure(
         width=600,
-        frame_height=250,
+        frame_height=150,
         sizing_mode="stretch_width",
         x_axis_type="datetime",
         toolbar_location="right",
@@ -163,6 +163,7 @@ def main_page(doc):
         ("Best Bid Price", [bid_line]),
         ("Best Ask Price", [ask_line])
     ], location="left", orientation="horizontal", click_policy="hide", spacing=20)
+    legend.label_text_font_size = "9pt"
     price_fig.add_layout(legend, 'above')
     # Add separate hover tools for each line
     bid_hover = HoverTool(renderers=[bid_line], tooltips=[
@@ -204,6 +205,7 @@ def main_page(doc):
         LegendItem(label="Asks", renderers=[hist_fig.renderers[1]]),
         LegendItem(label="Mid Price", renderers=[mid_price_line])
     ], location="top_left", orientation="horizontal", click_policy="hide", spacing=20)
+    legend.label_text_font_size = "9pt"
     hist_fig.add_layout(legend, 'above')
     hist_fig.xaxis.axis_label = "Price"
     hist_fig.yaxis.axis_label = "Quantity"
