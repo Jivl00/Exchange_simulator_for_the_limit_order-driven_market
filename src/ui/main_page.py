@@ -297,14 +297,14 @@ def main_page(doc):
         balance_text.text = f"""
                             <div style="display: flex; justify-content: space-between;">
                                 <span style="{label_style}">Remaining Balance:</span>
-                                <span style="{value_style}">${local_balance:.2f}</span>
+                                <span style="{value_style}">🪙 {local_balance:.2f}</span>
                             </div>
         
                             """
         quantity_text.text = f"""
                             <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
                                 <span style="{label_style}">Owned Quantity:</span>
-                                <span style="{value_style}">{local_quantity}</span>
+                                <span style="{value_style}"> {local_quantity}</span>
                             </div>
                             """
         fee_text.text = f"""
