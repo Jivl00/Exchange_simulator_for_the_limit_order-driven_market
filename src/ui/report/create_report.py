@@ -50,7 +50,7 @@ def display_order_book(order_book_data, aggregated=False, product=None):
     print(order_book_df.fillna('').to_string(index=False))
 
 if __name__ == '__main__':
-    file_path = '../data/2025-04-04_20-52-09-server_data.pickle'
+    file_path = '../data/2025-04-09_19-28-29-server_data.pickle'
     data = pickle_load(file_path)
     for product, order_books in data.items():
         users = {}
@@ -61,7 +61,7 @@ if __name__ == '__main__':
                 "budget": user_data.budget,
                 "balance": [],
                 "volume": [],
-                "num_orders": 0,
+                "num_orders": user_data.num_orders
             }
         for order_book in order_books["order_books"]:
             order_book = json.loads(order_book)
@@ -71,11 +71,11 @@ if __name__ == '__main__':
             timestamps.append(order_book["Timestamp"])
             bids_df = pd.DataFrame(order_book['Bids'])
             asks_df = pd.DataFrame(order_book['Asks'])
-            for df in [bids_df, asks_df]:
-                for _, row in df.iterrows():
-                    user = row['User']
-                    if user in users:
-                        users[user]["num_orders"] += 1
+            # for df in [bids_df, asks_df]:
+            #     for _, row in df.iterrows():
+            #         user = row['User']
+            #         if user in users:
+            #             print(f"User {user} placed an order at {order_book['Timestamp']}:")
     print("Users:")
     for user, user_data in users.items():
         print(f"User {user}:")

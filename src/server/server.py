@@ -253,11 +253,13 @@ class TradingHandler(MsgHandler):
             total_fee = fixed_fee + percentage_based_fee + per_share_based_fee
             user_manager.users[message["order"]["user"]].budget -= total_fee
 
-        # Broadcast the order book to all clients
-        broadcast_response = protocol.encode(
-            {"order_book": product_manager.get_order_book(product, False).jsonify_order_book(),
-             "product": product, "msg_type": "MarketDataSnapshot"})
-        asyncio.ensure_future(WebSocketHandler.broadcast(broadcast_response))
+            user_manager.increment_user_orders_counter(message["order"]["user"])
+
+            # Broadcast the changed order book to all clients
+            broadcast_response = protocol.encode(
+                {"order_book": product_manager.get_order_book(product, False).jsonify_order_book(),
+                 "product": product, "msg_type": "MarketDataSnapshot"})
+            asyncio.ensure_future(WebSocketHandler.broadcast(broadcast_response))
         return response
 
     @staticmethod

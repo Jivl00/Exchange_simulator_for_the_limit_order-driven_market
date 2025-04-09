@@ -3,10 +3,11 @@ class User:
         self.name = name
         self.user_ID = ID
         self.budget = budget
+        self.num_orders = 0
         self.post_buy_budget = budget
 
     def __str__(self):
-        return f"User {self.name} ({self.user_ID}) with budget {self.budget}"
+        return f"User {self.name} ({self.user_ID}) with budget {self.budget} sent {self.num_orders} orders."
 
 
 class UserManager:
@@ -22,6 +23,9 @@ class UserManager:
 
     def set_user_budget(self, user_ID, budget):
         self.users[user_ID].budget = budget
+
+    def increment_user_orders_counter(self, user_ID):
+        self.users[user_ID].num_orders += 1
 
     def user_exists(self, user_ID):
         return user_ID in self.users
