@@ -139,10 +139,18 @@ class Trader (Subscriber, ABC):
             return None
         return response
 
-    def register(self, budget):
+    def login_via_UUID(self, uuid):
+        """
+        Login to the server using a UUID.
+        :param uuid: UUID from the website
+        """
+        self.PROTOCOL.set_sender(uuid)
+        return True
+
+    def register(self, budget=1000):
         """
         Register a new user with the server.
-        :param budget: Initial budget
+        :param budget: Initial budget if not set by server
         :return: Unique user ID if successful, None otherwise
         """
         data = {"budget": budget, "msg_type": "RegisterRequest"}

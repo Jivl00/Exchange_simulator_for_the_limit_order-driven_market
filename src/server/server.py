@@ -54,6 +54,9 @@ fixed_fee = 0.01
 percentage_fee = 0.001
 per_share_fee = 0.005
 
+# Initial user budget
+INITIAL_BUDGET = 10000
+
 product_manager = TradingProductManager(products)
 user_manager = UserManager()
 db_path = "server/users.db"
@@ -179,7 +182,7 @@ class TradingHandler(MsgHandler):
         if user is None:
             raise ValueError("User not found in the database")
         user_ID = str(uuid.uuid4())
-        user_manager.add_user(message["user"], user_ID, message["budget"])
+        user_manager.add_user(message["user"], user_ID, INITIAL_BUDGET)
         return protocol.encode({"user": user_ID, "msg_type": "RegisterResponse"})  # Return new user ID
 
     @staticmethod

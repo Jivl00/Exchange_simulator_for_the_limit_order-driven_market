@@ -29,6 +29,6 @@ class Printer(AlgorithmicTrader):
 
 # Initialize the Printer agent
 config = json.load(open("../config/server_config.json"))
-printer_agent = Printer("printer_agent", "server", config)
+printer_agent = Printer("test_trader", "server", config)
 printer_agent.register(0)
 printer_agent.start_subscribe()
