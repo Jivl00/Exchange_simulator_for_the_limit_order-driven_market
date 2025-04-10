@@ -49,10 +49,9 @@ ID = 0
 # Initialize order books and matching engines for multiple products
 products = config["PRODUCTS"]
 
-# Trading fees, values taken from https://www.investopedia.com/terms/b/brokerage-fee.asp
+# Unrealistically cheap trading fees for testing
 fixed_fee = 0.01
-percentage_fee = 0.001
-per_share_fee = 0.005
+percentage_fee = 0.0001
 
 # Initial user budget
 INITIAL_BUDGET = 10000
@@ -251,9 +250,8 @@ class TradingHandler(MsgHandler):
         protocol.set_target(message["order"]["user"])  # Set target to user
         response = protocol.encode({"order_id": order.id, "status": status, "msg_type": "ExecutionReport"})
         if status is not False:  # If the order was added to the order book or fully matched -> apply trading fee
-            percentage_based_fee = order.price * percentage_fee
-            per_share_based_fee = order.quantity * per_share_fee
-            total_fee = fixed_fee + percentage_based_fee + per_share_based_fee
+            percentage_based_fee = order.price * order.quantity * percentage_fee
+            total_fee = fixed_fee + percentage_based_fee
             user_manager.users[message["order"]["user"]].budget -= total_fee
 
             user_manager.increment_user_orders_counter(message["order"]["user"])

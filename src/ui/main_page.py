@@ -74,7 +74,7 @@ def main_page(doc):
     user_id = trader.register(initial_balance)
 
     # Top screen info
-    product_info = Div(text="<h1 style='opacity: 0.5;'>StackUnderflow Stocks</h1>", width=290)
+    product_info = Div(text="<h1 style='opacity: 0.5;'>Honicoin Crypto</h1>", width=290)
     info_table = column(
         Div(text=f""),
         sizing_mode="stretch_both"
@@ -304,22 +304,21 @@ def main_page(doc):
         quantity_text.text = f"""
                             <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
                                 <span style="{label_style}">Owned Quantity:</span>
-                                <span style="{value_style}"> {local_quantity}</span>
+                                <span style="{value_style}"> {local_quantity} ℏ</span>
                             </div>
                             """
         fee_text.text = f"""
             <div style="display: flex; flex-direction: column; gap: 3px; padding: 5px; border: 1px solid #ccc; border-radius: 5px; background-color: #f9f9f9;">
                 <div style="display: flex; justify-content: space-between;">
                     <span style="{label_style}; font-weight: bold;">Trading Fee:</span>
-                    <span style="{value_style}; color: #d9534f; font-weight: bold;">0.01</span>
                 </div>
                 <div style="display: flex; justify-content: space-between;">
-                    <span style="{label_style};">+ Percentage of Price:</span>
-                    <span style="{value_style}; color: #d9534f;">0.1%</span>
+                    <span style="{label_style};">+ Fixed Transaction Fee:</span>
+                    <span style="{value_style}; color: #d9534f;">0.01</span>
                 </div>
                 <div style="display: flex; justify-content: space-between;">
-                    <span style="{label_style};">+ Percentage of quantity:</span>
-                    <span style="{value_style}; color: #d9534f;">0.5%</span>
+                    <span style="{label_style};">+ Order Value Fee:</span>
+                    <span style="{value_style}; color: #d9534f;">0.01%</span>
                 </div>
             </div>
         """
@@ -686,7 +685,7 @@ def main_page(doc):
     """)
     doc.on_event('document_ready', resize_callback)
 
-    doc.title = "StackUnderflow Stocks"
+    doc.title = "Honicoin"
     # Add to document
     doc.add_root(ui_layout)
     doc.add_periodic_callback(update, 1000)
