@@ -12,7 +12,7 @@ sys.path.append(os.path.join(os.path.dirname(__file__), '../../..'))
 
 from src.client.client import AdminTrader
 
-logging.getLogger("urllib3").setLevel(logging.WARNING) # Suppress logging
+logging.getLogger("urllib3").setLevel(logging.WARNING)  # Suppress logging
 
 
 class SyntheticLiquidityProvider(AdminTrader, ABC):
@@ -23,7 +23,7 @@ class SyntheticLiquidityProvider(AdminTrader, ABC):
         :param config: Configuration dictionary
         """
         super().__init__("liquidity_generator", target, config)
-        self.initialize_liquidity_engine(10000, 10000)
+        self.initialize_liquidity_engine(10000, 1000)
         self.products = config["PRODUCTS"]
 
     def receive_market_data(self, data):
@@ -37,14 +37,15 @@ class SyntheticLiquidityProvider(AdminTrader, ABC):
         """
         while True:
             try:
-                time.sleep(random.randint(1, 5)) # Sleep for 1-5 seconds
+                time.sleep(random.randint(1, 5))  # Sleep for 1-5 seconds
                 product = random.choice(self.products)
                 order_book = self.order_book_request(product, depth=10)
                 bid_volume = sum([order["Quantity"] for order in order_book["Bids"]])
                 ask_volume = sum([order["Quantity"] for order in order_book["Asks"]])
                 if bid_volume == 0 and ask_volume == 0:
                     continue  # Skip this iteration if both Bids and Asks are empty
-                side = np.random.choice(["sell", "buy"], p=[bid_volume / (bid_volume + ask_volume), ask_volume / (bid_volume + ask_volume)])
+                side = np.random.choice(["sell", "buy"], p=[bid_volume / (bid_volume + ask_volume),
+                                                            ask_volume / (bid_volume + ask_volume)])
                 # randomly select a price
                 if side == "buy":
                     if order_book["Bids"]:
@@ -61,14 +62,19 @@ class SyntheticLiquidityProvider(AdminTrader, ABC):
                     else:
                         continue  # Skip this iteration if both Bids and Asks are empty
                 self.delete_dispensable_orders(product, price, 1, 30)
-                price = price + random.uniform(-0.1, 0.1) # Add some noise to the price
+                price = price + random.uniform(-0.1, 0.1)  # Add some noise to the price
                 quantity = self.compute_quantity(product, side, price)
+                if side == "sell":
+                    bid_volume = sum([order["Quantity"] for order in order_book["Bids"][:5]])
+                    counter_side_volume = max(1, bid_volume // 4)
+                    quantity = min(counter_side_volume, quantity)  # Limit maximum quantity
                 if quantity > 0:
                     self.put_order({"side": side, "quantity": quantity, "price": price}, product)
                     logging.info(f"Synthetic liquidity added: {side} order at {price} for {quantity} {product}")
             except Exception as e:
                 logging.error(f"Error in generating liquidity: {e}")
                 continue
+
 
 if __name__ == "__main__":
     try:
