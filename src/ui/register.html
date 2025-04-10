@@ -10,15 +10,31 @@
     <script src="https://cdn.bokeh.org/bokeh/release/bokeh-tables-3.7.0.min.js"></script>
     <script src="https://cdn.bokeh.org/bokeh/release/bokeh-gl-3.7.0.min.js"></script>
     <link rel="stylesheet" href="https://cdn.bokeh.org/bokeh/release/bokeh-3.7.0.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" referrerpolicy="no-referrer" />
     <style>
+        html {
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+        }
+
         body {
             font-family: 'Arial', sans-serif;
             background-color: #f4f7fc;
             display: flex;
             justify-content: center;
             align-items: center;
-            height: 100vh;
+            height: 100%;
             margin: 0;
+            flex-direction: column;
+        }
+
+        main {
+            flex: 1; /* Take up all the vertical space */
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
         }
 
         .form-container {
@@ -28,6 +44,24 @@
             box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
             width: 100%;
             max-width: 400px;
+            flex: 1;
+        }
+
+        footer {
+            background-color: #e9e9e9;
+            color: #444;
+            font-size: 13px;
+            padding: 8px 10px;
+            text-align: center;
+            width: 100%;
+            border-top: 1px solid #ccc;
+            position: relative;
+            z-index: 1000;
+            flex-shrink: 0;
+        }
+
+        footer i {
+            margin: 0 5px;
         }
 
         .form-group {
@@ -162,31 +196,92 @@
 </head>
 
 <body>
-    <div class="form-container">
-        <h2 style="text-align: center; color: #333;">Register</h2>
-        <form id="register_form" method="post">
-            <div class="form-group">
-                <label for="username_input">Email</label>
-                <input type="text" id="username_input" placeholder="Enter your email">
+
+    <main>
+    <div>
+        <div class="form-container" style="margin-bottom: 20px;">
+            <div style="text-align: center; margin-bottom: 20px;">
+                <h1 style="color: #2c3e50; font-size: 24px;">Welcome to the Easter Game 🐣</h1>
+                <p style="color: #555;">Come and find the Treasure!</p>
+                <p style="font-size: 15px;">
+                    🗓️ Registration from: <strong>Friday 11. 4. 2025 8:00</strong><br>
+                    <span id="betaTesting" style="font-weight: bold; color: #3498db;"></span><br>
+                    🎮 Game starts in: <span id="resetTimer" style="font-weight: bold; color: #e67e22;"></span><br><span style="font-size: 12px;">(Friday 18. 4. 2025 8:00)</span><br>
+                    🏁 End in: <span id="endTimer" style="font-weight: bold; color: #c0392b;"></span><br><span style="font-size: 12px;">(Monday 21. 4. 2025 20:00)</span>
+                </p>
             </div>
-            <div class="form-group">
-                <label for="password_input">Password</label>
-                <input type="password" id="password_input" placeholder="Enter your password">
-            </div>
-            <div class="form-group">
-                <label for="confirm_password_input">Confirm Password</label>
-                <input type="password" id="confirm_password_input" placeholder="Re-enter your password">
-            </div>
-            <div class="form-group" style="text-align: center;">
-                <button type="submit" id="register_button">
-                    Register
-                </button>
-            </div>
-            <div class="form-group">
-                <p>Already registered? <a href="/login">Login here</a></p>
-            </div>
-        </form>
+        </div>
+
+        <div class="form-container">
+            <h2 style="text-align: center; color: #333;">Register</h2>
+            <form id="register_form" method="post">
+                <div class="form-group">
+                    <label for="username_input">Email</label>
+                    <input type="text" id="username_input" placeholder="Enter your email">
+                </div>
+                <div class="form-group">
+                    <label for="password_input">Password</label>
+                    <input type="password" id="password_input" placeholder="Enter your password">
+                </div>
+                <div class="form-group">
+                    <label for="confirm_password_input">Confirm Password</label>
+                    <input type="password" id="confirm_password_input" placeholder="Re-enter your password">
+                </div>
+                <div class="form-group" style="text-align: center;">
+                    <button type="submit" id="register_button">
+                        Register
+                    </button>
+                </div>
+                <div class="form-group">
+                    <p>Already registered? <a href="/login">Login here</a></p>
+                </div>
+            </form>
+        </div>
+
     </div>
+    </main>
+
+    <script>
+        function startCountdown(id, targetDate, finishedText) {
+            function updateCountdown() {
+                const now = new Date().getTime();
+                const distance = targetDate - now;
+
+                if (distance <= 0) {
+                    document.getElementById(id).innerText = finishedText || "";
+                    if (id === "resetTimer") {
+                        document.getElementById("resetTimer").style.color = "#28a745";
+                    }
+                    if (id === "endTimer") {
+                        document.getElementById("resetTimer").innerText = "The game has ended!";
+                        document.getElementById("resetTimer").style.color = "#c0392b";
+                    }
+                    return;
+                }
+
+                const days = Math.floor(distance / (1000 * 60 * 60 * 24));
+                const hours = Math.floor((distance % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+                const minutes = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60));
+                const seconds = Math.floor((distance % (1000 * 60)) / 1000);
+
+                if (id === "betaTesting") {
+                    document.getElementById(id).innerText = "Beta testing NOW until the real game starts!";
+                } else {
+                    document.getElementById(id).innerText = `${days}d ${hours}h ${minutes}m ${seconds}s`;
+                }
+            }
+
+            updateCountdown(); // Initial call
+            setInterval(updateCountdown, 1000);
+        }
+
+        const resetTime = new Date("2025-04-18T08:00:00+02:00").getTime(); // Pá 18. 4. 8:00
+        const endTime = new Date("2025-04-21T20:00:00+02:00").getTime();   // Po 21. 4. 20:00
+
+        startCountdown("betaTesting", resetTime, "");
+        startCountdown("resetTimer", resetTime, "The game has started!");
+        startCountdown("endTimer", endTime, "The game has ended!");
+    </script>
 
     <script>
         document.addEventListener("DOMContentLoaded", function () {
@@ -254,6 +349,17 @@
         document.getElementById("errorModal").style.display = "block";
         {% end %}
     </script>
+
+    <footer>
+        If anything seems to be wrong, please contact me:
+        <i class="fab fa-discord" style="color: #5865F2;"></i> <strong>jivl00 (Vladimira Kimlova#4312)</strong>
+        <span style="margin: 0 8px;">|</span>
+        <i class="fas fa-envelope" style="color: #007BFF;"></i>
+        <a href="mailto:jivl@students.zcu.cz" style="color: #007BFF; text-decoration: none;">
+            jivl@students.zcu.cz
+        </a>
+    </footer>
+
 </body>
 
 </html>

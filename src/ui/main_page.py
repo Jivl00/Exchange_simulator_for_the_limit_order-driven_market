@@ -120,7 +120,7 @@ def main_page(doc):
     logout_button = Button(label="Logout", button_type="danger", width=70)
     logout_button.stylesheets = ["button { margin-top: 18px; }"]
     logout_button.js_on_click(CustomJS(code=f"""
-        window.location.href = "{config["HOST"]}:{config["VIZ_PORT"]}/logout";
+        window.top.location.href = "{config["HOST"]}:{config["VIZ_PORT"]}/logout";
     """))
     price_input = TextInput(title="Price", value="100")
     quantity_input = TextInput(title="Quantity", value="1")
