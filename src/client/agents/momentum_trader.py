@@ -37,7 +37,7 @@ class MomentumTrader(AlgorithmicTrader):
 
     def handle_market_data(self, message):
         """
-        Handles incoming market data.
+        Handles incoming market data - storing mid prices for the product.
         :param message: Market data message - dictionary with keys "product", "order_book"
         """
         product = message["product"]

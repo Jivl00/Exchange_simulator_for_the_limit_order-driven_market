@@ -24,7 +24,7 @@ class ScalpingTrader(AlgorithmicTrader):
 
     def handle_market_data(self, message):
         """
-        Handles incoming market data.
+        Handles incoming market data - storing mid prices for the product.
         :param message: Market data message - dictionary with keys "product", "order_book"
         """
         product = message["product"]
@@ -41,7 +41,7 @@ class ScalpingTrader(AlgorithmicTrader):
 
     def trade(self, message):
         """
-        Executes the trading strategy based on market data.
+        Executes the trading strategy based on market data - placing limit orders around the mid price.
         :param message:
         :return:
         """
