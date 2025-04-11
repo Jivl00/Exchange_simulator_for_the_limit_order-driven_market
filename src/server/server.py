@@ -218,7 +218,11 @@ class TradingHandler(MsgHandler):
         # Check order details viability
         if message["order"]["side"] not in ["buy", "sell"]:
             return protocol.encode({"order_id": -1, "status": False, "msg_type": "ExecutionReport"})
-        if message["order"]["quantity"] <= 0 or message["order"]["price"] <= 0:
+        if round(message["order"]["quantity"]) <= 0 or round(message["order"]["price"], 2) <= 0:
+            return protocol.encode({"order_id": -1, "status": False, "msg_type": "ExecutionReport"})
+        # Check extreme values
+        max_int = 2**31-1
+        if message["order"]["quantity"] > max_int - 1 or message["order"]["price"] > max_int - 1:
             return protocol.encode({"order_id": -1, "status": False, "msg_type": "ExecutionReport"})
 
         # If the order is a buy order, check if the user has enough budget to place the order
