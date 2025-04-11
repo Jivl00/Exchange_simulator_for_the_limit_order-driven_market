@@ -60,16 +60,14 @@ def bokeh_auth_middleware(handler):
         if encoded_cookie:
             user = decode_signed_value(cookie_secret, name="user", value=encoded_cookie)
             if user:
-                # Attach user info to request arguments for access in the app
-                request.arguments["user"] = [user]
+                request._decoded_user = user
         return handler(doc)
     return wrapper
 
 
 @bokeh_auth_middleware
 def main_page(doc):
-    session_context = doc.session_context
-    user = session_context.request.arguments.get("user", [b"unknown"])[0].decode()
+    user = getattr(doc.session_context.request, "_decoded_user", b"unknown").decode()
 
     if user == "unknown":
         # User is not logged in, redirect to the login page
