@@ -295,9 +295,17 @@ def main_page(doc):
         local_quantity = user_data["current_balance"]["post_sell_volume"]
 
         balance_text.text = f"""
-                            <div style="display: flex; justify-content: space-between;">
+                            <div style="display: flex; align-items: center; justify-content: space-between;">
                                 <span style="{label_style}">Remaining Balance:</span>
-                                <span style="{value_style}">🪙 {local_balance:.2f}</span>
+                                <div style="{value_style}; display: inline-flex; align-items: center;">
+                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="16" height="16" style="margin-right: 4px;">
+                                        <circle cx="32" cy="32" r="30" fill="#FFD700" stroke="#DAA520" stroke-width="4" />
+                                        <text x="50%" y="50%" text-anchor="middle" dy=".3em" font-size="30" fill="#DAA520" font-family="Arial, sans-serif">
+                                            ℏ
+                                        </text>
+                                    </svg>
+                                    {local_balance:.2f}
+                                </div>
                             </div>
         
                             """
@@ -308,12 +316,13 @@ def main_page(doc):
                             </div>
                             """
         fee_text.text = f"""
-            <div style="display: flex; flex-direction: column; gap: 3px; padding: 5px; border: 1px solid #ccc; border-radius: 5px; background-color: #f9f9f9;">
+            <div style="display: flex; flex-direction: column; gap: 3px; padding: 5px;
+             border: 1px solid #ccc; border-radius: 5px; background-color: #f9f9f9; width: 185px;">
                 <div style="display: flex; justify-content: space-between;">
-                    <span style="{label_style}; font-weight: bold;">Trading Fee:</span>
+                    <span style="{label_style}; font-weight: bold;">Trading Fee =</span>
                 </div>
                 <div style="display: flex; justify-content: space-between;">
-                    <span style="{label_style};">+ Fixed Transaction Fee:</span>
+                    <span style="{label_style};">Fixed Transaction Fee:</span>
                     <span style="{value_style}; color: #d9534f;">0.01</span>
                 </div>
                 <div style="display: flex; justify-content: space-between;">
@@ -788,7 +797,11 @@ def make_app():
         (r"/login", LoginHandler),
         (r"/register", RegisterHandler),
         (r"/logout", LogoutHandler),
-    ], debug=True, autoreload=True, cookie_secret=cookie_secret)
+        (r"/static/(.*)", tornado.web.StaticFileHandler, {
+            "path": os.path.join(os.path.dirname(__file__), "static")
+        }),
+    ],
+    debug=True, autoreload=True, cookie_secret=cookie_secret)
     return tornado_app
 
 
