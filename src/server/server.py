@@ -488,7 +488,7 @@ def make_app():
         (f"/{config['TRADING_SESSION']}", TradingHandler),
         (f"/{config['QUOTE_SESSION']}", QuoteHandler),
         (r"/websocket", WebSocketHandler),
-    ], debug=True, autoreload=True)
+    ], debug=True)
 
 
 def load_data():

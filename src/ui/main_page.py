@@ -13,6 +13,8 @@ import sys
 
 sys.path.append(os.path.join(os.path.dirname(__file__), '../..'))
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
+
+from tornado.web import decode_signed_value
 from bokeh.application import Application
 from bokeh.server.server import Server
 from bokeh.application.handlers.function import FunctionHandler
@@ -40,9 +42,31 @@ db_path = os.path.join(os.path.dirname(__file__), "../server/users.db")
 conn = sqlite3.connect(db_path)
 cursor = conn.cursor()
 
+cookie_secret = os.urandom(32)
+
+
 # =====================
 # Bokeh App Initialization
 # =====================
+def bokeh_auth_middleware(handler):
+    def wrapper(doc):
+        # This runs when a session is created
+        session_context = doc.session_context
+        request = session_context.request
+        cookie_header = request.headers.get("Cookie", "")
+        cookies = dict(pair.strip().split('=', 1) for pair in cookie_header.split(';') if '=' in pair)
+        encoded_cookie = cookies.get("user")
+
+        if encoded_cookie:
+            user = decode_signed_value(cookie_secret, name="user", value=encoded_cookie)
+            if user:
+                # Attach user info to request arguments for access in the app
+                request.arguments["user"] = [user]
+        return handler(doc)
+    return wrapper
+
+
+@bokeh_auth_middleware
 def main_page(doc):
     session_context = doc.session_context
     user = session_context.request.arguments.get("user", [b"unknown"])[0].decode()
@@ -791,7 +815,6 @@ def make_app():
     Create a Tornado web application with a Bokeh server application.
     :return: Tornado web application
     """
-    cookie_secret = os.urandom(32)
     tornado_app = tornado.web.Application([
         (r"/", MainHandler),
         (r"/login", LoginHandler),
