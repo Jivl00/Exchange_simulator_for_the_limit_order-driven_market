@@ -1,3 +1,5 @@
+from abc import abstractmethod
+
 import numpy as np
 from src.client.client import Trader
 
@@ -89,7 +91,7 @@ class AlgorithmicTrader (Trader):
             if quantity > 0:
                 self.put_order({"side": "buy", "quantity": quantity, "price": predicted_ask}, product)
 
-    # @abstractmethod
+    @abstractmethod
     def handle_market_data(self, message):
         """
         Handles incoming market data.
@@ -97,7 +99,7 @@ class AlgorithmicTrader (Trader):
         """
         pass
 
-    # @abstractmethod
+    @abstractmethod
     def trade(self, message):
         """
         Executes trading strategy.

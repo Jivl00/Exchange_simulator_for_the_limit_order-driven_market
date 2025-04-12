@@ -11,11 +11,24 @@ from src.client.client import AdminTrader
 
 logger = logging.getLogger(__name__)
 
+"""
+For the tests to run correctly, the INITIAL_BUDGET set in the server.py must be 10000
+"""
 python_path = "C:\\Users\\vladka\\PycharmProjects\\pythonProject\\venv\\Scripts\\python.exe"
 
 class TestAdminTrader(AdminTrader):
     def receive_market_data(self, data):
         pass # Required implementation for abstract class
+
+class TestTrader(AlgorithmicTrader):
+    def __init__(self, target, config):
+        super().__init__("test_trader", target, config)
+
+    def handle_market_data(self, data):
+        pass
+
+    def trade(self, message):
+        pass
 
 def configure_test_logging():
     """
@@ -84,7 +97,7 @@ class TestAlgorithmicTraderIntegration(unittest.TestCase):
             if not server_started:
                 raise Exception("Failed to start the server. Exiting...")
 
-            self.trader = AlgorithmicTrader("test_trader", "Server1", config)
+            self.trader = TestTrader("Server1", config)
             self.tester = TestAdminTrader("liquidity_generator", "Server1", config)
             self.tester.initialize_liquidity_engine(10000, 10000)
             logger.info("Server started and AlgorithmicTrader initialized.")
@@ -293,8 +306,8 @@ class TestAlgorithmicTraderIntegration(unittest.TestCase):
         """
         logger.info("Starting Scenario 4: Compute Quantity Function Test")
 
-        # Register a user with a budget of 1000
-        self.register_user(1000)
+        # Register a user with a budget of 10000
+        self.register_user(10000)
 
         # Compute quantity when the order book is empty
         quantity = self.trader.compute_quantity("product1", "buy", 100, ratio=0.5)
@@ -302,17 +315,17 @@ class TestAlgorithmicTraderIntegration(unittest.TestCase):
         logger.info("Empty order book test passed.")
 
         # Populate the order book with sample data
-        self.tester.put_order({"price": 100, "quantity": 9, "side": "sell"}, "product1")
-        self.tester.put_order({"price": 98, "quantity": 5, "side": "buy"}, "product1")
+        self.tester.put_order({"price": 100, "quantity": 90, "side": "sell"}, "product1")
+        self.tester.put_order({"price": 98, "quantity": 50, "side": "buy"}, "product1")
 
         # Compute quantity using 50% of the budget (buy scenario)
         quantity = self.trader.compute_quantity("product1", "buy", 100, ratio=0.5)
-        self.assertEqual(quantity, 5, "Expected to compute 5 units using 50% of the budget (500/100).")
+        self.assertEqual(quantity, 50, "Expected to compute 50 units using 50% of the budget (500/100).")
         logger.info("50% budget test (buy) passed.")
 
         # Compute quantity using 100% of the budget (buy scenario)
         quantity = self.trader.compute_quantity("product1", "buy", 100, ratio=1.0)
-        self.assertEqual(quantity, 9, "Expected to compute 9 units using 100% of the budget, limited by available volume.")
+        self.assertEqual(quantity, 90, "Expected to compute 90 units using 100% of the budget, limited by available volume.")
         logger.info("100% budget test (buy) passed.")
 
         # Compute quantity using invalid price (zero price)
