@@ -5,8 +5,8 @@ from src.client.client import Trader
 
 class AlgorithmicTrader (Trader):
     """
-    Interface for algorithmic trading agents.
-    Must implement:
+    Abstract class for algorithmic trading agents.
+    Any agent that inherits from this class must implement the following methods:
     - handle_market_data
     - trade
     """
