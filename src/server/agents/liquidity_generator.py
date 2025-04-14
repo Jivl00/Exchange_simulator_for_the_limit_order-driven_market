@@ -16,14 +16,16 @@ logging.getLogger("urllib3").setLevel(logging.WARNING)  # Suppress logging
 
 
 class SyntheticLiquidityProvider(AdminTrader, ABC):
-    def __init__(self, target, config):
+    def __init__(self, target, config, budget=10000, volume=1000):
         """
         Inicialize Synthetic Liquidity Provider.
         :param target: Name of the server
         :param config: Configuration dictionary
+        :param budget: Total budget to allocate for generating liquidity
+        :param volume: Total volume to allocate for generating liquidity
         """
         super().__init__("liquidity_generator", target, config)
-        self.initialize_liquidity_engine(10000, 1000)
+        self.initialize_liquidity_engine(budget, volume)
         self.products = config["PRODUCTS"]
 
     def receive_market_data(self, data):
@@ -77,9 +79,6 @@ class SyntheticLiquidityProvider(AdminTrader, ABC):
 
 
 if __name__ == "__main__":
-    try:
-        config = json.load(open("../config/server_config.json"))
-        liquidity_generator = SyntheticLiquidityProvider("server", config)
-        liquidity_generator.generate_liquidity()
-    except KeyboardInterrupt:
-        logging.info("Liquidity generator stopped by user.")
+    config = json.load(open("../config/server_config.json"))
+    liquidity_generator = SyntheticLiquidityProvider("server", config)
+    liquidity_generator.generate_liquidity()

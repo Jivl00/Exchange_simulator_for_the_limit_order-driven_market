@@ -141,7 +141,8 @@ class MarketMaker(AdminTrader, ABC):
                     print(f"Initial liquidity added: {side} order at {price} for {quantity} {product}")
 
 
-config = json.load(open("../config/server_config.json"))
-market_maker = MarketMaker("server", config, volume={"product1": 1000, "product2": 200})
-market_maker.initialize_market()
-market_maker.generate_market_data()
+if __name__ == "__main__":
+    config = json.load(open("../config/server_config.json"))
+    market_maker = MarketMaker("server", config, volume={"product1": 1000, "product2": 200})
+    market_maker.initialize_market()
+    market_maker.generate_market_data()
