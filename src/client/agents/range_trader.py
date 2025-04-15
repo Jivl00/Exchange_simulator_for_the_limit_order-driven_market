@@ -9,8 +9,8 @@ class RangeTrader(AlgorithmicTrader):
         :param name: Name of the agent
         :param server: Server name
         :param config: Configuration dictionary
-        :param support_level: Price threshold for buying
-        :param resistance_level: Price threshold for selling
+        :param support_level: Price threshold below which buy orders are triggered.
+        :param resistance_level: Price threshold above which sell orders are triggered.
         """
         super().__init__(name, server, config)
         self.support_level = support_level
@@ -19,7 +19,9 @@ class RangeTrader(AlgorithmicTrader):
 
     def handle_market_data(self, message):
         """
-        Handles incoming market data - storing bid and ask prices for the product.
+        Processes incoming market data and updates internal price tracking.
+        - Stores the latest bid and ask prices for the given product.
+        - Deletes dispensable orders based on mid-price and defined thresholds.
         :param message: Market data message - dictionary with keys "product", "order_book"
         """
         product = message["product"]
@@ -32,24 +34,27 @@ class RangeTrader(AlgorithmicTrader):
 
     def trade(self, message):
         """
-        Executes the trading strategy based on the market data and support/resistance levels.
+        Executes the range trading strategy based on support and resistance levels.
+        - Places buy orders when the bid price is below the support level.
+        - Places sell orders when the ask price is at or above the resistance level.
         :param message: Market data message - dictionary with keys "product", "order_book"
         """
         product = message["product"]
         bid_price, ask_price = self.prices[product]["bid"], self.prices[product]["ask"]
 
         # Make trading decisions based on support and resistance levels
-        if bid_price < self.support_level: # Buy
+        if bid_price < self.support_level:  # Buy
             quantity = self.compute_quantity(product, "buy", bid_price)
             if quantity > 0:
                 self.put_order({"side": "buy", "quantity": quantity, "price": bid_price}, product)
-        elif ask_price >= self.resistance_level: # Sell
+        elif ask_price >= self.resistance_level:  # Sell
             quantity = self.compute_quantity(product, "sell", ask_price)
             if quantity > 0:
                 self.put_order({"side": "sell", "quantity": quantity, "price": ask_price}, product)
 
-config = json.load(open("../config/server_config.json"))
-swing_trader = RangeTrader("range_trader", "server", config)
-swing_trader.register(1000)
-swing_trader.start_subscribe()
 
+if __name__ == "__main__":
+    config = json.load(open("../config/server_config.json"))
+    swing_trader = RangeTrader("range_trader", "server", config)
+    swing_trader.register(1000)
+    swing_trader.start_subscribe()

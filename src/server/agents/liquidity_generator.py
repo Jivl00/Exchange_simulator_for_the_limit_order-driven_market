@@ -34,8 +34,8 @@ class SyntheticLiquidityProvider(AdminTrader, ABC):
     def generate_liquidity(self):
         """
         Generate synthetic liquidity by placing random orders.
-        Orders are placed randomly on the bid or ask side with random price and quantity.
-        Side is selected based on the volume of Bids and Asks (weighted random choice).
+        - Orders are placed randomly on the bid or ask side with random price and quantity.
+        - Side is selected based on the volume of Bids and Asks (weighted random choice).
         """
         while True:
             try:

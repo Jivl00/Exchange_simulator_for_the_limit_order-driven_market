@@ -86,7 +86,10 @@ class MarketMaker(AdminTrader, ABC):
 
     def generate_market_data(self):
         """
-        Generate market data by placing orders based on historical mid-prices.
+        Continuously generates market data by placing synthetic orders based on historical mid-prices.
+        - Retrieves historical mid-prices to calculate dynamic spreads for each product.
+        - Places buy or sell orders depending on the availability of bids and asks.
+        - Ensures orders are placed with appropriate quantities and prices derived from market conditions.
         """
         while True:
             try:
@@ -117,8 +120,10 @@ class MarketMaker(AdminTrader, ABC):
 
     def initialize_market(self, scale=0.1):
         """
-        Initialize the market by adding initial liquidity.
-        :param scale: Scale factor for exponential distribution
+        Adds initial liquidity to the market by placing a set number of buy and sell orders.
+        - Bid and ask prices are generated using an exponential distribution around the starting price.
+        - Quantities for bids and asks are weighted to ensure a balanced distribution.
+        :param scale: Scale factor for the exponential distribution, controlling price and quantity spread.
         """
         for product in self.products:
             num_orders = self.initial_num_orders[product]
