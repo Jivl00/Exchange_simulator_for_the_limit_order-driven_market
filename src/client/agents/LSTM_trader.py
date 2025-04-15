@@ -63,7 +63,9 @@ class DeepLearningTrader(AlgorithmicTrader):
 
     def handle_market_data(self, message):
         """
-        Handle incoming market data - store features and train the LSTM model.
+        Processes incoming market data and updates historical features.
+        - Stores bid/ask prices, volumes, and imbalance indices.
+        - Prepares data for LSTM training and prediction.
         :param message: Market data message - dictionary with keys "product", "order_book"
         """
         product = message["product"]
@@ -106,7 +108,9 @@ class DeepLearningTrader(AlgorithmicTrader):
 
     def get_features(self, product):
         """
-        Compute additional features for LSTM input
+        Computes additional features for LSTM input.
+        - Includes bid/ask prices, volumes, imbalance indices, spread, and momentum.
+        - Deletes dispensable orders based on the latest mid-price.
         :param product: Product name
         :return: Feature matrix
         """
@@ -172,7 +176,9 @@ class DeepLearningTrader(AlgorithmicTrader):
 
     def trade(self, message):
         """
-        Execute trading strategy based on predicted prices.
+        Executes trades based on predicted prices and current market conditions.
+        - Places buy or sell orders if the predicted prices meet the threshold.
+        :param message: Market data message - dictionary with keys "product", "order_book"
         """
         product = message["product"]
         self.train_model()
@@ -183,8 +189,8 @@ class DeepLearningTrader(AlgorithmicTrader):
 
 
 
-# Setup and run the LSTMTrader
-config = json.load(open("../config/server_config.json"))
-lstm_trader = DeepLearningTrader("lstm_trader", "server", config)
-lstm_trader.register(10000)
-lstm_trader.start_subscribe()
+if __name__ == "__main__":
+    config = json.load(open("../config/server_config.json"))
+    lstm_trader = DeepLearningTrader("lstm_trader", "server", config)
+    lstm_trader.register(10000)
+    lstm_trader.start_subscribe()

@@ -13,7 +13,7 @@ class MomentumTrader(AlgorithmicTrader):
         :param config: Configuration dictionary
         :param metric: Metric to use for momentum calculation: "percentage_change", "RSI", "SMA", "EMA"
         :param lookback: Number of historical prices to consider - base your choice on the selected metric
-        :param volatility_threshold: Threshold for volatility to avoid trading
+        :param volatility_threshold: Maximum allowable volatility to execute trades.
         """
         super().__init__(name, server, config)
         self.metric = self.select_metric(metric)
@@ -37,7 +37,9 @@ class MomentumTrader(AlgorithmicTrader):
 
     def handle_market_data(self, message):
         """
-        Handles incoming market data - storing mid prices for the product.
+        Processes incoming market data and updates the mid-price history for the product.
+        - Maintains a rolling window of mid-prices based on the lookback period.
+        - Deletes outdated or unnecessary orders based on the current mid-price.
         :param message: Market data message - dictionary with keys "product", "order_book"
         """
         product = message["product"]
@@ -64,6 +66,7 @@ class MomentumTrader(AlgorithmicTrader):
     def compute_RSI(prices):
         """
         Compute the Relative Strength Index (RSI) based on historical prices.
+         - RSI > 70 indicates overbought, RSI < 30 indicates oversold.
         :param prices: List of historical prices
         :return: Signal value based on RSI - positive for overbought, negative for oversold
         """
@@ -91,13 +94,17 @@ class MomentumTrader(AlgorithmicTrader):
         :param prices: List of historical prices
         :return: Signal value based on EMA - positive for price above EMA, negative for price below EMA
         """
-        ema =  pd.Series(prices).ewm(alpha=0.6, adjust=False).mean().iloc[-1]
+        alpha = 2 / (len(prices) + 1)
+        ema =  pd.Series(prices).ewm(alpha=alpha, adjust=False).mean().iloc[-1]
         return 1 if prices[-1] > ema else -1  # Price above/below EMA
 
 
     def trade(self, message):
         """
-        Executes the trading strategy based on the selected metric.
+        Executes trades based on the selected momentum metric and market conditions.
+        - Skips trading if there is insufficient historical data or if volatility exceeds the threshold.
+        - Places buy orders for positive momentum and sell orders for negative momentum.
+        :param message: Market data message - dictionary with keys "product", "order_book"
         """
         product = message["product"]
         if len(self.mid_prices[product]) < self.lookback:
@@ -122,8 +129,8 @@ class MomentumTrader(AlgorithmicTrader):
                 self.put_order({"side": "sell", "quantity": quantity, "price": self.mid_prices[product][-1]}, product)
 
 
-# Initialize and run the MomentumTrader
-config = json.load(open("../config/server_config.json"))
-momentum_trader = MomentumTrader("momentum_trader", "server", config, "percentage_change")
-momentum_trader.register(10000)
-momentum_trader.start_subscribe()
+if __name__ == "__main__":
+    config = json.load(open("../config/server_config.json"))
+    momentum_trader = MomentumTrader("momentum_trader", "server", config, "percentage_change")
+    momentum_trader.register(10000)
+    momentum_trader.start_subscribe()

@@ -4,25 +4,29 @@ from src.client.algorithmic_trader import AlgorithmicTrader
 import json
 import numpy as np
 class SwingTrader(AlgorithmicTrader):
-    def __init__(self, name, server, config, lookback=20, bollinger_std=2, confirm_ticks=3):
+    def __init__(self, name, server, config, lookback=20, bollinger_std=2, confirm_ticks=3, imbalance_threshold=0.2):
         """
         Initializes the SwingTrader with additional indicators.
         :param name: Name of the agent
         :param server: Server name
         :param config: Configuration dictionary
         :param lookback: Number of historical prices to consider
-        :param bollinger_std: Standard deviation multiplier for Bollinger Bands
+        :param bollinger_std: Standard deviation multiplier for Bollinger Bands (default is 2)
         :param confirm_ticks: Number of ticks to confirm breakout
+        :param imbalance_threshold: Threshold for order book imbalance index
         """
         super().__init__(name, server, config)
         self.lookback = lookback
         self.bollinger_std = bollinger_std
         self.confirm_ticks = confirm_ticks
+        self.imbalance_threshold = imbalance_threshold
         self.mid_prices = {}
 
     def handle_market_data(self, message):
         """
-        Handles incoming market data - storing mid prices for the product.
+        Processes incoming market data and updates the mid-price history for the product.
+        - Maintains a rolling window of mid-prices based on the lookback period.
+        - Deletes outdated or unnecessary orders based on the current mid-price.
         :param message: Market data message - dictionary with keys "product", "order_book"
         """
         product = message["product"]
@@ -66,7 +70,10 @@ class SwingTrader(AlgorithmicTrader):
 
     def trade(self, message):
         """
-        Executes the trading strategy based on Bollinger Bands, Fibonacci, and Imbalance Index.
+        Executes the swing trading strategy based on Bollinger Bands, Fibonacci levels, and order book imbalance.
+        - Places buy orders when the price is below the lower Bollinger Band and key Fibonacci levels and imbalance index is negative.
+        - Places sell orders when the price is above the upper Bollinger Band and key Fibonacci levels and imbalance index is positive.
+        :param message: Market data message - dictionary with keys "product", "order_book"
         """
         product = message["product"]
         prices = self.mid_prices[product]
@@ -91,11 +98,11 @@ class SwingTrader(AlgorithmicTrader):
 
         # Trade logic
         mid_price = prices[-1]
-        if mid_price < lower_band and imbalance_index < -0.2 and mid_price < fib_levels["38.2%"]:
+        if mid_price < lower_band and imbalance_index < -self.imbalance_threshold and mid_price < fib_levels["38.2%"]:
             quantity = self.compute_quantity(product, "buy", mid_price)
             if quantity > 0:
                 self.put_order({"type": "limit", "side": "buy", "quantity": quantity, "price": mid_price}, product)
-        elif mid_price > upper_band and imbalance_index > 0.2 and mid_price > fib_levels["61.8%"]:
+        elif mid_price > upper_band and imbalance_index > self.imbalance_threshold  and mid_price > fib_levels["61.8%"]:
             quantity = self.compute_quantity(product, "sell", mid_price)
             if quantity > 0:
                 self.put_order({"type": "limit", "side": "sell", "quantity": quantity, "price": mid_price}, product)
@@ -103,8 +110,8 @@ class SwingTrader(AlgorithmicTrader):
 
 
 
-# Initialize and run the SwingTrader
-config = json.load(open("../config/server_config.json"))
-swing_trader = SwingTrader("swing_trader", "server", config)
-swing_trader.register(1000)
-swing_trader.start_subscribe()
+if __name__ == "__main__":
+    config = json.load(open("../config/server_config.json"))
+    swing_trader = SwingTrader("swing_trader", "server", config)
+    swing_trader.register(1000)
+    swing_trader.start_subscribe()

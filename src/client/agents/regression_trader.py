@@ -14,7 +14,7 @@ class RegressionTrader(AlgorithmicTrader):
         :param config:  Configuration dictionary
         :param base_window_size:  Initial window size
         :param model_type:  Type of regression model to use: "linear", "ridge", "lasso", "bayesian", "random_forest"
-        :param price_threshold:  Price threshold for trading
+        :param price_threshold: Minimum price difference required to execute a trade.
         """
         super().__init__(name, server, config)
         self.base_window_size = base_window_size
@@ -23,7 +23,7 @@ class RegressionTrader(AlgorithmicTrader):
         self.prices = {}
         self.volumes = {}
 
-        # Select the regression model dynamically
+        # Select the regression model based on the provided model type
         self.model = self.select_model(model_type)
 
     def select_model(self, model_type):
@@ -42,7 +42,9 @@ class RegressionTrader(AlgorithmicTrader):
 
     def handle_market_data(self, message):
         """
-        Handles incoming market data - storing bid and ask prices and volumes for the product.
+        Processes incoming market data and updates historical price and volume data.
+        - Dynamically adjusts the rolling window size based on market volatility.
+        - Trims historical data to maintain the adjusted window size.
         :param message: Market data message - dictionary with keys "product", "order_book"
         """
         product = message["product"]
@@ -81,10 +83,11 @@ class RegressionTrader(AlgorithmicTrader):
 
     def predict_price(self, prices, volumes):
         """
-        Predicts the next price based on the given prices and volumes.
-        :param prices: List of prices
-        :param volumes: List of volumes
-        :return: Predicted price
+        Predicts the next price using regression based on historical prices and volumes.
+        - Uses volume-weighted regression to give more importance to higher-volume data points.
+        :param prices: List of historical prices
+        :param volumes: List of historical volumes corresponding to the prices
+        :return: Predicted price for the next time step
         """
         x = np.array(range(len(prices))).reshape(-1, 1)  # Time steps
         y = np.array(prices).reshape(-1, 1)
@@ -97,7 +100,10 @@ class RegressionTrader(AlgorithmicTrader):
 
     def trade(self, message):
         """
-        Executes trading strategy - sell when predicted bid > current bid, buy when predicted ask < current ask.
+        Executes trades based on predicted prices and current market conditions.
+        - Places a sell order if the predicted bid price exceeds the current bid price.
+        - Places a buy order if the predicted ask price is below the current ask price.
+        :param message: Market data message - dictionary with keys "product", "order_book"
         """
         product = message["product"]
         if len(self.prices[product]["mid"]) < self.window_size:
@@ -110,8 +116,8 @@ class RegressionTrader(AlgorithmicTrader):
 
         self.bid_ask_trade((current_bid, current_ask), (predicted_bid, predicted_ask), self.price_threshold, product)
 
-# Setup and run the RegressionTrader
-config = json.load(open("../config/server_config.json"))
-r_trader = RegressionTrader("lr_trader", "server", config, model_type="random_forest")
-r_trader.register(10000)
-r_trader.start_subscribe()
+if __name__ == "__main__":
+    config = json.load(open("../config/server_config.json"))
+    r_trader = RegressionTrader("lr_trader", "server", config, model_type="random_forest")
+    r_trader.register(10000)
+    r_trader.start_subscribe()

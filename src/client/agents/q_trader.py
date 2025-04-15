@@ -34,7 +34,8 @@ class QLearningTrader(AlgorithmicTrader):
 
     def handle_market_data(self, message):
         """
-        Handles incoming market data and retroactively evaluates the reward for the last action taken.
+        Processes incoming market data and updates price history.
+        - Evaluates the reward for the last action taken based on price changes retroactively.
         :param message: Market data message - dictionary with keys "product", "order_book"
         """
         product = message["product"]
@@ -135,7 +136,7 @@ class QLearningTrader(AlgorithmicTrader):
 
     def trade(self, message):
         """
-        Execute the trade and update the Q-table based on the reward.
+        Executes trades based on the selected action and updates the Q-table based on the reward.
         :param message: Market data message - dictionary with keys "product", "order_book"
         """
         if self.mid_price() is None:
@@ -167,8 +168,8 @@ class QLearningTrader(AlgorithmicTrader):
         self.last_trade_time[product] = current_time
 
 
-# Setup and start the QLearningTrader
-config = json.load(open("../config/server_config.json"))
-ql_trader = QLearningTrader("ql_trader", "server", config)
-ql_trader.register(10000)
-ql_trader.start_subscribe()
+if __name__ == "__main__":
+    config = json.load(open("../config/server_config.json"))
+    ql_trader = QLearningTrader("ql_trader", "server", config)
+    ql_trader.register(10000)
+    ql_trader.start_subscribe()

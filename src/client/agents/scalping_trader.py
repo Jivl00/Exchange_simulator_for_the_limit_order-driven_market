@@ -24,7 +24,9 @@ class ScalpingTrader(AlgorithmicTrader):
 
     def handle_market_data(self, message):
         """
-        Handles incoming market data - storing mid prices for the product.
+        Processes incoming market data and updates the mid-price history for the product.
+        - Maintains a rolling window of mid-prices based on the volatility lookback period.
+        - Deletes outdated or unnecessary orders based on the current mid-price.
         :param message: Market data message - dictionary with keys "product", "order_book"
         """
         product = message["product"]
@@ -41,9 +43,11 @@ class ScalpingTrader(AlgorithmicTrader):
 
     def trade(self, message):
         """
-        Executes the trading strategy based on market data - placing limit orders around the mid price.
-        :param message:
-        :return:
+        Implements the scalping trading strategy by placing limit orders around the calculated mid-price.
+        - Dynamically adjusts the spread based on market volatility to optimize trade execution.
+        - Places a buy order below the mid-price and a sell order above the mid-price.
+        - Ensures a minimum time interval between consecutive trades for the same product.
+        :param message: Market data message - dictionary with keys "product", "order_book"
         """
 
         product = message["product"]
@@ -72,7 +76,8 @@ class ScalpingTrader(AlgorithmicTrader):
         self.last_trade_time[product] = time.time()
 
 
-config = json.load(open("../config/server_config.json"))
-scalping_trader = ScalpingTrader("scalping_trader", "server", config)
-scalping_trader.register(1000)
-scalping_trader.start_subscribe()
+if __name__ == "__main__":
+    config = json.load(open("../config/server_config.json"))
+    scalping_trader = ScalpingTrader("scalping_trader", "server", config)
+    scalping_trader.register(1000)
+    scalping_trader.start_subscribe()
