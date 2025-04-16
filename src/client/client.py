@@ -271,7 +271,7 @@ class Trader (Subscriber, ABC):
         """
         Returns the order book for a specific product from the server.
         :param product: Product name
-        :param depth: Market depth (0 = full book) #TODO: Parameter not used
+        :param depth: Market depth (0 = full book)
         :return: JSON with order book data
         """
         data = {"depth": depth, "product": product, "msg_type": "MarketDataRequest"}

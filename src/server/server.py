@@ -2,6 +2,9 @@ import asyncio
 import os
 import sqlite3
 import sys
+from itertools import islice
+
+from sortedcontainers import SortedDict
 
 sys.path.append(os.path.join(os.path.dirname(__file__), '../..'))
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
@@ -353,9 +356,15 @@ class QuoteHandler(MsgHandler):
         :return: server response
         """
         product = message["product"]
+        depth = message.get("depth", -1)
         if not product_exists(product):
             return protocol.encode({"order_book": None, "product": product, "msg_type": "MarketDataSnapshot"})
         order_book = product_manager.get_order_book(product, False)
+        order_book = order_book.copy()
+        if depth > 0:
+            order_book.bids = SortedDict(islice(reversed(order_book.bids.items()), depth))
+            order_book.asks = SortedDict(islice(order_book.asks.items(), depth))
+
         order_book_data = order_book.jsonify_order_book()
         return protocol.encode({"order_book": order_book_data, "product": product, "msg_type": "MarketDataSnapshot"})
 
