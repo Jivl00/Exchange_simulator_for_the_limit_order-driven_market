@@ -64,7 +64,7 @@ class SyntheticLiquidityProvider(AdminTrader, ABC):
                     else:
                         continue  # Skip this iteration if both Bids and Asks are empty
                 self.delete_dispensable_orders(product, price, 1, 30)
-                price = price + random.uniform(-0.1, 0.1)  # Add some noise to the price
+                price = price + random.uniform(-0.5, 0.5)  # Add some noise to the price
                 quantity = self.compute_quantity(product, side, price)
                 if side == "sell":
                     bid_volume = sum([order["Quantity"] for order in order_book["Bids"][:5]])
