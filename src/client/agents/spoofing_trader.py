@@ -91,8 +91,8 @@ class SpoofingTrader(AlgorithmicTrader):
                 self.delete_order(order_id, product)
             self.spoof_orders[product] = []
 
-# Initialize and run the SpoofingTrader
-config = json.load(open("../config/server_config.json"))
-spoofing_trader = SpoofingTrader("spoofing_trader", "server", config, spoof_distance=0.015)
-spoofing_trader.register(100000)
-spoofing_trader.start_subscribe()
+if __name__ == "__main__":
+    config = json.load(open("../config/server_config.json"))
+    spoofing_trader = SpoofingTrader("spoofing_trader", "server", config, spoof_distance=0.015)
+    spoofing_trader.register(100000)
+    spoofing_trader.start_subscribe()
