@@ -1,8 +1,12 @@
 import pandas as pd
-
-from src.client.algorithmic_trader import AlgorithmicTrader
+import os
+import sys
 import json
 import numpy as np
+
+sys.path.append(os.path.join(os.path.dirname(__file__), '../../..'))
+
+from src.client.algorithmic_trader import AlgorithmicTrader
 class SwingTrader(AlgorithmicTrader):
     def __init__(self, name, server, config, lookback=20, bollinger_std=2, confirm_ticks=3, imbalance_threshold=0.2):
         """

@@ -6,6 +6,11 @@ import json
 import numpy as np
 from collections import deque
 from sklearn.preprocessing import MinMaxScaler
+import os
+import sys
+
+sys.path.append(os.path.join(os.path.dirname(__file__), '../../..'))
+
 from src.client.algorithmic_trader import AlgorithmicTrader
 
 

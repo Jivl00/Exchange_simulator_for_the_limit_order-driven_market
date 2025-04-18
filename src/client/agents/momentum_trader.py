@@ -1,8 +1,12 @@
 import pandas as pd
-
-from src.client.algorithmic_trader import AlgorithmicTrader
 import json
 import numpy as np
+import os
+import sys
+
+sys.path.append(os.path.join(os.path.dirname(__file__), '../../..'))
+
+from src.client.algorithmic_trader import AlgorithmicTrader
 
 class MomentumTrader(AlgorithmicTrader):
     def __init__(self, name, server, config, metric, lookback=20, volatility_threshold=0.02):

@@ -1,5 +1,10 @@
-from src.client.algorithmic_trader import AlgorithmicTrader
+import os
+import sys
 import json
+
+sys.path.append(os.path.join(os.path.dirname(__file__), '../../..'))
+
+from src.client.algorithmic_trader import AlgorithmicTrader
 
 
 class RangeTrader(AlgorithmicTrader):

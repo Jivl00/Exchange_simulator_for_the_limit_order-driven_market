@@ -2,6 +2,11 @@ from sklearn.linear_model import LinearRegression, Ridge, Lasso, BayesianRidge
 from sklearn.ensemble import RandomForestRegressor
 import numpy as np
 import json
+import os
+import sys
+
+sys.path.append(os.path.join(os.path.dirname(__file__), '../../..'))
+
 from src.client.algorithmic_trader import AlgorithmicTrader
 
 
