@@ -541,8 +541,8 @@ def main_page(doc):
             return
 
         # Calculate the maximum allowed price to avoid badly scaled plots
-        max_allowed_price = df['Price'].shift(1) * 2
-        max_allowed_price.fillna(float('inf'), inplace=True)
+        mid_price = (bids_df['Price'].max() + asks_df['Price'].min()) / 2 if not bids_df.empty and not asks_df.empty else 100
+        max_allowed_price = mid_price * 2
         df = df[df['Price'] <= max_allowed_price]
 
         price_min = df['Price'].min()

@@ -477,7 +477,7 @@ class WebSocketHandler(tornado.websocket.WebSocketHandler):
         """
         message = {"message": message.decode()}
         closed_clients = set()
-        for client in cls.clients:
+        for client in list(cls.clients):
             try:
                 await client.write_message(message)
             except tornado.websocket.WebSocketClosedError:
