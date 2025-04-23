@@ -26,7 +26,7 @@ from bokeh.models import (
     ColumnDataSource, DataTable, TableColumn, Button, TextInput,
     RadioButtonGroup, Div, HoverTool, LegendItem, GroupBox, CustomJS
 )
-from ui.web_trader import WebTrader
+from viz.web_trader import WebTrader
 
 logging.getLogger('bokeh').setLevel(logging.INFO)
 config = json.load(open("../config/server_config.json"))

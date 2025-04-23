@@ -200,18 +200,18 @@
 
     <main>
     <div>
-        <div class="form-container" style="margin-bottom: 20px;">
-            <div style="text-align: center; margin-bottom: 20px;">
-                <h1 style="color: #2c3e50; font-size: 24px;">Welcome to the Easter Game 🐣</h1>
-                <p style="color: #555;">Come and find the Treasure!</p>
-                <p style="font-size: 15px;">
-                    🗓️ Registration from: <strong>Friday 11. 4. 2025 8:00</strong><br>
-                    <span id="betaTesting" style="font-weight: bold; color: #3498db;"></span><br>
-                    🎮 Game starts in: <span id="resetTimer" style="font-weight: bold; color: #e67e22;"></span><br><span style="font-size: 12px;">(Friday 18. 4. 2025 8:00)</span><br>
-                    🏁 End in: <span id="endTimer" style="font-weight: bold; color: #c0392b;"></span><br><span style="font-size: 12px;">(Monday 21. 4. 2025 20:00)</span>
-                </p>
-            </div>
-        </div>
+<!--        <div class="form-container" style="margin-bottom: 20px;">-->
+<!--            <div style="text-align: center; margin-bottom: 20px;">-->
+<!--                <h1 style="color: #2c3e50; font-size: 24px;">Welcome to the Easter Game 🐣</h1>-->
+<!--                <p style="color: #555;">Come and find the Treasure!</p>-->
+<!--                <p style="font-size: 15px;">-->
+<!--                    🗓️ Registration from: <strong>Friday 11. 4. 2025 8:00</strong><br>-->
+<!--                    <span id="betaTesting" style="font-weight: bold; color: #3498db;"></span><br>-->
+<!--                    🎮 Game starts in: <span id="resetTimer" style="font-weight: bold; color: #e67e22;"></span><br><span style="font-size: 12px;">(Friday 18. 4. 2025 8:00)</span><br>-->
+<!--                    🏁 End in: <span id="endTimer" style="font-weight: bold; color: #c0392b;"></span><br><span style="font-size: 12px;">(Monday 21. 4. 2025 20:00)</span>-->
+<!--                </p>-->
+<!--            </div>-->
+<!--        </div>-->
 
         <div class="form-container">
             <h2 style="text-align: center; color: #333;">Register</h2>
@@ -242,47 +242,47 @@
     </div>
     </main>
 
-    <script>
-        function startCountdown(id, targetDate, finishedText) {
-            function updateCountdown() {
-                const now = new Date().getTime();
-                const distance = targetDate - now;
+<!--    <script>-->
+<!--        function startCountdown(id, targetDate, finishedText) {-->
+<!--            function updateCountdown() {-->
+<!--                const now = new Date().getTime();-->
+<!--                const distance = targetDate - now;-->
 
-                if (distance <= 0) {
-                    document.getElementById(id).innerText = finishedText || "";
-                    if (id === "resetTimer") {
-                        document.getElementById("resetTimer").style.color = "#28a745";
-                    }
-                    if (id === "endTimer") {
-                        document.getElementById("resetTimer").innerText = "The game has ended!";
-                        document.getElementById("resetTimer").style.color = "#c0392b";
-                    }
-                    return;
-                }
+<!--                if (distance <= 0) {-->
+<!--                    document.getElementById(id).innerText = finishedText || "";-->
+<!--                    if (id === "resetTimer") {-->
+<!--                        document.getElementById("resetTimer").style.color = "#28a745";-->
+<!--                    }-->
+<!--                    if (id === "endTimer") {-->
+<!--                        document.getElementById("resetTimer").innerText = "The game has ended!";-->
+<!--                        document.getElementById("resetTimer").style.color = "#c0392b";-->
+<!--                    }-->
+<!--                    return;-->
+<!--                }-->
 
-                const days = Math.floor(distance / (1000 * 60 * 60 * 24));
-                const hours = Math.floor((distance % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-                const minutes = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60));
-                const seconds = Math.floor((distance % (1000 * 60)) / 1000);
+<!--                const days = Math.floor(distance / (1000 * 60 * 60 * 24));-->
+<!--                const hours = Math.floor((distance % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));-->
+<!--                const minutes = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60));-->
+<!--                const seconds = Math.floor((distance % (1000 * 60)) / 1000);-->
 
-                if (id === "betaTesting") {
-                    document.getElementById(id).innerText = "Beta testing NOW until the real game starts!";
-                } else {
-                    document.getElementById(id).innerText = `${days}d ${hours}h ${minutes}m ${seconds}s`;
-                }
-            }
+<!--                if (id === "betaTesting") {-->
+<!--                    document.getElementById(id).innerText = "Beta testing NOW until the real game starts!";-->
+<!--                } else {-->
+<!--                    document.getElementById(id).innerText = `${days}d ${hours}h ${minutes}m ${seconds}s`;-->
+<!--                }-->
+<!--            }-->
 
-            updateCountdown(); // Initial call
-            setInterval(updateCountdown, 1000);
-        }
+<!--            updateCountdown(); // Initial call-->
+<!--            setInterval(updateCountdown, 1000);-->
+<!--        }-->
 
-        const resetTime = new Date("2025-04-18T08:00:00+02:00").getTime(); // Pá 18. 4. 8:00
-        const endTime = new Date("2025-04-21T20:00:00+02:00").getTime();   // Po 21. 4. 20:00
+<!--        const resetTime = new Date("2025-04-18T08:00:00+02:00").getTime(); // Pá 18. 4. 8:00-->
+<!--        const endTime = new Date("2025-04-21T20:00:00+02:00").getTime();   // Po 21. 4. 20:00-->
 
-        startCountdown("betaTesting", resetTime, "");
-        startCountdown("resetTimer", resetTime, "The game has started!");
-        startCountdown("endTimer", endTime, "The game has ended!");
-    </script>
+<!--        startCountdown("betaTesting", resetTime, "");-->
+<!--        startCountdown("resetTimer", resetTime, "The game has started!");-->
+<!--        startCountdown("endTimer", endTime, "The game has ended!");-->
+<!--    </script>-->
 
     <script>
         document.addEventListener("DOMContentLoaded", function () {
@@ -351,15 +351,15 @@
         {% end %}
     </script>
 
-    <footer>
-        If anything seems to be wrong, please contact me:
-        <i class="fab fa-discord" style="color: #5865F2;"></i> <strong>jivl00 (Vladimira Kimlova#4312)</strong>
-        <span style="margin: 0 8px;">|</span>
-        <i class="fas fa-envelope" style="color: #007BFF;"></i>
-        <a href="mailto:jivl@students.zcu.cz" style="color: #007BFF; text-decoration: none;">
-            jivl@students.zcu.cz
-        </a>
-    </footer>
+<!--    <footer>-->
+<!--        If anything seems to be wrong, please contact me:-->
+<!--        <i class="fab fa-discord" style="color: #5865F2;"></i> <strong>jivl00 (Vladimira Kimlova#4312)</strong>-->
+<!--        <span style="margin: 0 8px;">|</span>-->
+<!--        <i class="fas fa-envelope" style="color: #007BFF;"></i>-->
+<!--        <a href="mailto:jivl@students.zcu.cz" style="color: #007BFF; text-decoration: none;">-->
+<!--            jivl@students.zcu.cz-->
+<!--        </a>-->
+<!--    </footer>-->
 
 </body>
 

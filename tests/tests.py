@@ -5,6 +5,10 @@ import time
 import logging
 import requests
 import colorlog
+import os
+import sys
+
+sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 
 from src.client.algorithmic_trader import AlgorithmicTrader
 from src.client.client import AdminTrader
