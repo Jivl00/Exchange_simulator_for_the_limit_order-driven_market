@@ -1,7 +1,5 @@
 import json
 import logging
-import sqlite3
-import bcrypt
 import time
 import threading
 import numpy as np
@@ -27,7 +25,11 @@ from bokeh.models import (
     RadioButtonGroup, Div, HoverTool, LegendItem, GroupBox, CustomJS
 )
 from viz.web_trader import WebTrader
+from handlers import MainHandler, LoginHandler, LogoutHandler, RegisterHandler
 
+# =====================
+# Configuration and Logging
+# =====================
 logging.getLogger('bokeh').setLevel(logging.INFO)
 config = json.load(open("../config/server_config.json"))
 
@@ -38,10 +40,7 @@ common_style = "font-family: 'Arial', sans-serif; font-size: 12px;"
 label_style = f"{common_style} color: rgba(0, 0, 0, 0.5);"
 value_style = f"{common_style} color: rgba(0, 0, 0, 1);"
 
-db_path = os.path.join(os.path.dirname(__file__), "../server/users.db")
-conn = sqlite3.connect(db_path)
-cursor = conn.cursor()
-
+# Cookie secret for secure cookies
 cookie_secret = os.urandom(32)
 
 
@@ -49,7 +48,17 @@ cookie_secret = os.urandom(32)
 # Bokeh App Initialization
 # =====================
 def bokeh_auth_middleware(handler):
+    """
+    Middleware to decode the user from the cookie and attach it to the request.
+    :param handler: The Bokeh application handler.
+    :return: A wrapper function that decodes the user from the cookie.
+    """
+
     def wrapper(doc):
+        """
+        Middleware function to decode the user from the cookie and attach it to the request.
+        :param doc: The Bokeh document.
+        """
         # This runs when a session is created
         session_context = doc.session_context
         request = session_context.request
@@ -62,18 +71,25 @@ def bokeh_auth_middleware(handler):
             if user:
                 request._decoded_user = user
         return handler(doc)
+
     return wrapper
 
 
 @bokeh_auth_middleware
 def main_page(doc):
+    """
+    Main page of the Bokeh application.
+    :param doc: The Bokeh document.
+    """
+
+    # Check if the user is logged in
     user = getattr(doc.session_context.request, "_decoded_user", b"unknown").decode()
 
     if user == "unknown":
         # User is not logged in, redirect to the login page
         doc.title = "Login Required"
         doc.clear()
-        
+
         # Create a styled message prompting for login
         login_message = """
             <h1 style='color: red; text-align: center;'>
@@ -85,15 +101,14 @@ def main_page(doc):
                 </a>
             </div>
         """.format(host=config['HOST'], port=config['VIZ_PORT'])
-        
+
         # Add the message to the document
         doc.add_root(Div(text=login_message))
         return
 
-    # Reinitialize models to ensure they are unique per session
-    initial_balance = 10000
+    # Initialize the client for trading
     trader = WebTrader(user, "server", config)
-    user_id = trader.register(initial_balance)
+    user_id = trader.register(10000)
 
     # Top screen info
     product_info = Div(text="<h1 style='opacity: 0.5;'>Honicoin Crypto</h1>", width=290)
@@ -102,7 +117,9 @@ def main_page(doc):
         sizing_mode="stretch_both"
     )
 
-    # Trader dynamic text
+    # =====================
+    # Data Sources
+    # =====================
     balance_text = Div(text=f"", width=300)
     quantity_text = Div(text=f"", width=300)
     fee_text = Div(text=f"", width=300)
@@ -111,7 +128,7 @@ def main_page(doc):
     order_source = ColumnDataSource(data={'ID': [], 'price': [], 'quantity': [], 'side': []})
     history_source = ColumnDataSource(data={'time': [], 'price': [], 'quantity': [], 'side': []})
     hist_source = ColumnDataSource(data={'left': [], 'right': [], 'bid_top': [], 'ask_top': []})
-    mid_price_source = ColumnDataSource(data={'x': [0,0], 'y': [0,0]})
+    mid_price_source = ColumnDataSource(data={'x': [0, 0], 'y': [0, 0]})
     hist_bid_table_source = ColumnDataSource(
         data={'bid_price': [], 'bid_quantity': [], 'int_bid_price': [], 'price_label': [],
               'price_pos': [], 'quantity_label': [], 'quantity_pos': []})
@@ -138,7 +155,6 @@ def main_page(doc):
             input.value = initial_value;
         }
     """))
-    # <a href="/logout" class="btn btn-danger logout-btn">Logout</a>
     logout_button = Button(label="Logout", button_type="danger", width=70)
     logout_button.stylesheets = ["button { margin-top: 18px; }"]
     logout_button.js_on_click(CustomJS(code=f"""
@@ -150,6 +166,7 @@ def main_page(doc):
     send_button = Button(label="Send Order", button_type="success")
     delete_button = Button(label="Delete Selected", button_type="danger")
 
+    # Active orders table
     columns = [
         TableColumn(field="ID", title="ID"),
         TableColumn(field="price", title="Price"),
@@ -157,7 +174,8 @@ def main_page(doc):
         TableColumn(field="side", title="Side"),
     ]
     order_table = DataTable(source=order_source, columns=columns, width=365, height=276)
-    # replace id colum with timestamp
+
+    # History table
     columns[0] = TableColumn(field="time", title="Timestamp")
     history_table = DataTable(source=history_source, columns=columns, height=200, sizing_mode="stretch_width")
     history_table_group = GroupBox(
@@ -308,6 +326,9 @@ def main_page(doc):
     # Callbacks
     # =====================
     def update():
+        """
+        Update the UI with the latest data from the trading engine.
+        """
         order_book = trader.order_book_request("product1")
         update_histogram(order_book)
         update_histogram_table(order_book)
@@ -360,7 +381,7 @@ def main_page(doc):
         # Iterate over the original orders
         if user_orders:
             for order_key, order in user_orders.items():
-                new_orders['ID'].append(int(order['id']))  # Convert 'id' to an integer (if needed)
+                new_orders['ID'].append(int(order['id']))
                 new_orders['price'].append(order['price'])
                 new_orders['quantity'].append(order['quantity'])
                 new_orders['side'].append(order['side'])
@@ -422,9 +443,13 @@ def main_page(doc):
         return (V_bt - V_at) / (V_bt + V_at)
 
     def update_price(order_book):
+        """
+        Update the price chart with the latest data from the order book.
+        :param order_book: The order book data.
+        :return: The mid price and imbalance index.
+        """
         bids = order_book["Bids"]
         asks = order_book["Asks"]
-        # datetime.datetime.min + datetime.timedelta(seconds=t // 1e9)
         seconds = order_book["Timestamp"] / 1e9  # Convert nanoseconds to seconds
         seconds = datetime.datetime.fromtimestamp(seconds)
         bid_price = bids[0]["Price"] if bids else np.nan
@@ -451,11 +476,19 @@ def main_page(doc):
         return mid_price, imbalance
 
     def add_notification(message, color):
+        """
+        Add a notification message to the popup.
+        :param message: Message to display
+        :param color: Background color of the message
+        """
         timestamp = time.time()  # Get current time
         new_data = dict(messages=[message], colors=[color], timestamps=[timestamp])
         popup_source.stream(new_data, rollover=5)  # Keeps only the last 5 notifications
 
     def update_popup():
+        """
+        Update the popup messages by removing old messages.
+        """
         current_time = time.time()
         data = popup_source.data
         messages, colors, timestamps = data.get("messages", []), data.get("colors", []), data.get("timestamps", [])
@@ -472,7 +505,7 @@ def main_page(doc):
 
         # Update UI
         html_content = "<div id='toast-container' style='position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); " \
-                          "display: flex; flex-direction: column; align-items: center; width: 400px;'>"
+                       "display: flex; flex-direction: column; align-items: center; width: 400px;'>"
         for i in range(len(new_messages)):
             html_content += f"<div style='background-color: {new_colors[i]}; color: white; padding: 10px; " \
                             f"border-radius: 5px; margin-bottom: 5px; font-weight: bold; text-align: center;'>{new_messages[i]}</div>"
@@ -480,6 +513,9 @@ def main_page(doc):
         notifications_container.text = html_content
 
     def send_order():
+        """
+        Send a new order to the trading engine.
+        """
         try:
             price = float(price_input.value)
         except ValueError:
@@ -510,7 +546,11 @@ def main_page(doc):
                 'side': [side]
             })
             update()
+
     def delete_order():
+        """
+        Delete the selected order from the order book.
+        """
         selected = order_source.selected.indices
         if not selected or not order_source.data['ID'] or selected[0] >= len(order_source.data['ID']):
             return
@@ -520,13 +560,17 @@ def main_page(doc):
         update()
 
     def update_histogram(order_book):
+        """
+        Update the histogram with the latest data from the order book.
+        :param order_book: The order book data.
+        """
 
         # Extract Bids and Asks dataframes
         bids_df = pd.DataFrame(order_book.get('Bids', []))
         asks_df = pd.DataFrame(order_book.get('Asks', []))
 
         # Combine both Bids and Asks into a single dataframe
-        # If Bids or Asks are empty, we only use the non-empty dataframe
+        # If Bids or Asks are empty, only use the non-empty dataframe
         if not bids_df.empty and not asks_df.empty:
             df = pd.concat([bids_df[['Price', 'Quantity']], asks_df[['Price', 'Quantity']]], ignore_index=True)
         elif not bids_df.empty:
@@ -541,7 +585,8 @@ def main_page(doc):
             return
 
         # Calculate the maximum allowed price to avoid badly scaled plots
-        mid_price = (bids_df['Price'].max() + asks_df['Price'].min()) / 2 if not bids_df.empty and not asks_df.empty else 100
+        mid_price = (bids_df['Price'].max() + asks_df[
+            'Price'].min()) / 2 if not bids_df.empty and not asks_df.empty else 100
         max_allowed_price = mid_price * 2
         df = df[df['Price'] <= max_allowed_price]
 
@@ -583,6 +628,10 @@ def main_page(doc):
         }
 
     def update_histogram_table(order_book):
+        """
+        Update the histogram table with the latest data from the order book.
+        :param order_book: The order book data.
+        """
         bids_df = pd.DataFrame(order_book.get('Bids', []))
         asks_df = pd.DataFrame(order_book.get('Asks', []))
 
@@ -619,6 +668,7 @@ def main_page(doc):
             hist_ask_table_source.data = {'ask_price': [], 'ask_quantity': [], 'int_ask_price': [], 'price_pos': [],
                                           'quantity_pos': []}
 
+    # Bind callbacks
     send_button.on_click(send_order)
     delete_button.on_click(delete_order)
 
@@ -665,7 +715,8 @@ def main_page(doc):
     )
 
     table = column(product_info, table_book_group, info_table_group, width=table_width, sizing_mode="stretch_height")
-    graphs = column(price_fig_group, hist_fig_group, history_table_group, width=graphs_width, sizing_mode="stretch_height")
+    graphs = column(price_fig_group, hist_fig_group, history_table_group, width=graphs_width,
+                    sizing_mode="stretch_height")
     ui_layout = row(table, graphs, control_box, sizing_mode="stretch_both")
     ui_layout = column(ui_layout, notifications_container, sizing_mode="stretch_both")
 
@@ -723,89 +774,6 @@ def main_page(doc):
     doc.add_periodic_callback(update_popup, 500)
 
 
-class MainHandler(tornado.web.RequestHandler):
-    def get(self):
-        user = self.get_secure_cookie("user")
-        if user:
-            self.render("index.html", host=config["HOST"], user=user.decode())
-        else:
-            self.redirect("/login")
-
-
-class LoginHandler(tornado.web.RequestHandler):
-    def get(self):
-        # If there's an error message, pass it to the template
-        error_message = self.get_argument("error", "")
-        self.render("login.html", error_message=error_message)
-
-    def post(self):
-        username = self.get_argument("username", "")
-        password = self.get_argument("password", "")
-
-        # Check if username exists in the database
-        cursor.execute("SELECT * FROM users WHERE email=?", (username,))
-        if cursor.fetchone() is None:
-            # Redirect with an error message to the login page
-            self.redirect("/login?error=User not found!")
-            return
-
-        # Check if the username is a valid email
-        if "@" not in username:  # WHAT A CRAZY EMAIL REGEX, right?
-            self.redirect("/login?error=Invalid email address!")
-            return
-
-        # Check if the password matches
-        cursor.execute("SELECT password FROM users WHERE email=?", (username,))
-        result = cursor.fetchone()
-        stored_password = result[0]
-        if not bcrypt.checkpw(password.encode('utf-8'), stored_password.encode('utf-8')): # Redirect with an error message to the login page
-            self.redirect("/login?error=Incorrect password!")
-            return
-
-        # Redirect to dashboard or home page after successful login
-        self.set_secure_cookie("user", username)
-        self.redirect("/")
-
-
-class RegisterHandler(tornado.web.RequestHandler):
-    def get(self):
-        # If there's an error message, pass it to the template
-        error_message = self.get_argument("error", "")
-        self.render("register.html", error_message=error_message)
-
-    def post(self):
-        username = self.get_argument("username", "")
-        password = self.get_argument("password", "")
-        confirm_password = self.get_argument("confirm_password", "")
-
-        # Check if the username is a valid email
-        if "@" not in username:  # WHAT A CRAZY EMAIL REGEX, right?
-            self.redirect("/register?error=Invalid email address!")
-            return
-
-        # Check if the username is already taken
-        cursor.execute("SELECT * FROM users WHERE email=?", (username,))
-        users = cursor.fetchall()
-        if username in users:
-            self.redirect("/register?error=Email already registered!")
-            return
-
-        # Check if the passwords match
-        if password != confirm_password:
-            self.redirect("/register?error=Passwords do not match!")
-            return
-
-        # Create a new user and save it to the database
-        hashed_password = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())
-        cursor.execute("INSERT INTO users (email, password) VALUES (?, ?)", (username, hashed_password.decode('utf-8')))
-        conn.commit()
-        self.redirect("/login")
-
-
-class LogoutHandler(tornado.web.RequestHandler):
-    def get(self):
-        self.clear_cookie("user")
-        self.redirect("/login")
 
 
 def make_app():
@@ -822,17 +790,20 @@ def make_app():
             "path": os.path.join(os.path.dirname(__file__), "static")
         }),
     ],
-    debug=True, autoreload=True, cookie_secret=cookie_secret)
+        debug=True, autoreload=True, cookie_secret=cookie_secret)
     return tornado_app
 
 
 def bk_worker():
+    """
+    Start the Bokeh server in a separate thread.
+    """
     bokeh_app = Application(FunctionHandler(main_page))
     server = Server(
         {'/bokeh': bokeh_app},
         allow_websocket_origin=[f"{config['HOST'].replace('http://', '')}:{config['VIZ_PORT']}",
                                 f"{config['HOST'].replace('http://', '')}:5006"],
-        port=5006,
+        port=5006, # Bokeh server port
     )
     server.start()
     server.io_loop.start()
