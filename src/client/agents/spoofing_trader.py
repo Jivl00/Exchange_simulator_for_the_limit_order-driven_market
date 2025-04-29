@@ -38,7 +38,7 @@ class SpoofingTrader(AlgorithmicTrader):
         """
         product = message["product"]
         if mid_price := self.mid_price():
-            self.delete_dispensable_orders(product, mid_price, 0.01, 30)
+            self.delete_dispensable_orders(product, mid_price, 1, 60)
     def trade(self, message):
         """
         Execute the spoofing strategy:
@@ -97,6 +97,6 @@ class SpoofingTrader(AlgorithmicTrader):
 
 if __name__ == "__main__":
     config = json.load(open("../config/server_config.json"))
-    spoofing_trader = SpoofingTrader("spoofing_trader", "server", config, spoof_distance=0.015)
+    spoofing_trader = SpoofingTrader("spoofing_trader", "server", config, spoof_distance=0.01)
     spoofing_trader.register(100000)
     spoofing_trader.start_subscribe()

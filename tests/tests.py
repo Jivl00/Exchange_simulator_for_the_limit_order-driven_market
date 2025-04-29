@@ -103,6 +103,7 @@ class TestAlgorithmicTraderIntegration(unittest.TestCase):
 
             self.trader = TestTrader("Server1", config)
             self.tester = TestAdminTrader("liquidity_generator", "Server1", config)
+            self.tester.register(0)
             self.tester.initialize_liquidity_engine(10000, 10000)
             logger.info("Server started and AlgorithmicTrader initialized.")
         except Exception as e:

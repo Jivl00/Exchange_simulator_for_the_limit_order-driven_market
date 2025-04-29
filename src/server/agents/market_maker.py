@@ -48,6 +48,7 @@ class MarketMaker(AdminTrader, ABC):
         self.initial_num_orders = {product: initial_num_orders for product in self.products} \
             if isinstance(initial_num_orders, int) else initial_num_orders
 
+        self.register(0)
         self.initialize_liquidity_engine(budget, volume)
 
     def receive_market_data(self, data):

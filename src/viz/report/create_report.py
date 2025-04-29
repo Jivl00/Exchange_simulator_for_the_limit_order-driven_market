@@ -3,6 +3,9 @@ import pickle
 
 import numpy as np
 import pandas as pd
+import plotly_resampler
+from plotly_resampler import FigureResampler
+import plotly.graph_objects as go
 
 
 def pickle_load(file_path):
@@ -84,66 +87,106 @@ def compute_statistics(users, mid_prices, initial_budget=10000):
     stats_df = pd.DataFrame(stats).sort_values(by="FinalBalance", ascending=False)
     return stats_df, stock_income
 
-def plot_best_traders(users, timestamps, mid_prices, top_10):
-    import matplotlib.pyplot as plt
-    import matplotlib.dates as mdates
 
+def plot_best_traders_interactive(users, timestamps, mid_prices, top_10):
     # Convert nanoseconds to datetime
     try:
         timestamps = pd.to_datetime(timestamps, unit='ns')
     except Exception as e:
         print(f"Error converting timestamps: {e}")
         return
-    fig, ax = plt.subplots(figsize=(12, 6))
 
-    # Primary y-axis for user balances
+    fig = FigureResampler(go.Figure(), default_downsampler=plotly_resampler.MinMaxLTTB(parallel=True))
+
+    user_balances = {}
     for user, data in users.items():
-        if user not in top_10["User"].values:
-            continue
-        if len(data["balance"]) > 0:
-            # padd the balance with 0 in the beginning to match the length of timestamps
-            balance = data["balance"]
-            balance = [0] * (len(timestamps) - len(balance)) + balance
-            ax.plot(timestamps, balance, label=data["name"])
+        if user in top_10["User"].values and len(data["balance"]) > 0:
+            volume = np.array(data["volume"])
+            balance = np.array(data["balance"]) + volume * mid_prices[-1]
+            # Pad the balance with 0 in the beginning to match the length of timestamps
+            padding = np.zeros(len(timestamps) - len(balance))  # Create padding as a numpy array
+            balance = np.concatenate((padding, balance))  # Concatenate padding and balance
+            user_balances[user] = balance
 
-    # Secondary y-axis for mid prices
-    ax2 = ax.twinx()
-    ax2.plot(timestamps, mid_prices, label="Mid Price", color='black', linestyle='--')
-    ax2.set_ylabel("Mid Price", color='black')
-    ax2.tick_params(axis='y', labelcolor='black')
+    # Add user balances to the plot
+    for user in top_10["User"].values:
+        user_name = f"{user[:4]}...{user[-4:]}"
+        if user in user_balances:
+            fig.add_trace(go.Scatter(
+                x=timestamps,
+                y=user_balances[user],
+                mode='lines',
+                name=user_name,
+                # name=users[user]["name"],
+                yaxis="y1"
+            ))
 
-    # Formatting the x-axis
-    ax.xaxis.set_major_locator(mdates.DayLocator())
-    ax.xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m-%d'))
-    plt.xticks(rotation=45)
+    # Add mid prices to the plot
+    fig.add_trace(go.Scatter(
+        x=timestamps,
+        y=mid_prices,
+        mode='lines',
+        name="Mid Price",
+        line=dict(color='black'),
+        opacity=0.5,
+        yaxis="y2"
+    ))
 
-    # Labels and title
-    ax.set_xlabel("Timestamp")
-    ax.set_ylabel("Balance")
-    ax.set_title("Balance of Best Traders Over Time")
+    # Update layout for dual y-axes
+    fig.update_layout(
+        title=dict(
+            text="Balance of Best Traders Over Time",
+            y=1,  # Move the title higher
+            pad=dict(t=5),  # Add padding to the title
 
-    # Legends
-    lines_1, labels_1 = ax.get_legend_handles_labels()
-    lines_2, labels_2 = ax2.get_legend_handles_labels()
-    ax.legend(lines_1 + lines_2, labels_1 + labels_2, loc="upper left")
+        ),
+        xaxis=dict(title="Timestamp"),
+        yaxis=dict(title="Balance", side="left"),
+        yaxis2=dict(title="Mid Price", overlaying="y", side="right"),
+        legend=dict(orientation="h", x=0.5, y=1.4, xanchor="center"),
+        margin=dict(l=50, r=50, t=170, b=50),
+        height=500, width=800,
+    )
 
-    plt.tight_layout()
-    plt.show()
+    for trace in fig.data:
+        trace.name = trace.name.split("~")[0].strip()
+        trace.name = trace.name.replace("[R]", "").strip()
 
+    # Update layout for font size
+    fig.update_layout(
+        title=dict(
+            text="Balance of Best Traders Over Time",
+            y=1,
+            font=dict(size=20)  # Increase title font size
+        ),
+        xaxis=dict(
+            title="Timestamp",
+            titlefont=dict(size=16),  # Increase x-axis title font size
+            tickfont=dict(size=14)  # Increase x-axis tick font size
+        ),
+        yaxis=dict(
+            title="Balance",
+            titlefont=dict(size=16),  # Increase y-axis title font size
+            tickfont=dict(size=14)  # Increase y-axis tick font size
+        ),
+        yaxis2=dict(
+            title="Mid Price",
+            titlefont=dict(size=16),  # Increase secondary y-axis title font size
+            tickfont=dict(size=14)  # Increase secondary y-axis tick font size
+        ),
+        legend=dict(
+            font=dict(size=14)  # Increase legend font size
+        ),
+        margin=dict(l=50, r=50, t=170, b=50),
+        height=500, width=800,
+    )
 
-if __name__ == '__main__':
-    file_paths = ['../data/2025-04-17_15-53-24-server_data.pickle', '../data/2025-04-17_15-58-57-server_data.pickle']
-    # file_paths = ['../data/2025-04-17_15-58-57-server_data.pickle']
-    users = {}
-    timestamps = []
-    mid_prices = []
-    for file_path in file_paths:
-        print(f"Processing file: {file_path}")
-        data = pickle_load(file_path)
-        for _, order_books in data.items():
-            extract_user_data(order_books, users, timestamps, mid_prices)
-    stats_df, stock_income = compute_statistics(users, mid_prices)
-    print(stats_df.to_string(index=False, justify='rigth', float_format='%.2f'))
-    print(f"  Stock fee income: {stock_income}")
-    top_10 = stats_df.head(10)
-    plot_best_traders(users, timestamps, mid_prices, top_10)
+    # Show the interactive plot
+    fig.show()
+    # Save the plot as a pdf
+    fig.write_image("best_traders_plot.pdf", format="pdf", engine="kaleido")
+    # Save the interactive plot as an HTML file
+    fig.write_html("best_traders_plot.html")
+    # Save the interactive plot as an png file
+    fig.write_image("best_traders_plot.png", format="png", engine="kaleido")
+

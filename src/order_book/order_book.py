@@ -242,10 +242,11 @@ class OrderBook:
         """
         return self.user_balance.get(user_id, {'balance': 0, 'volume': 0})  # Return 0 if user not found
 
-    def jsonify_order_book(self, depth=-1):
+    def jsonify_order_book(self, depth=-1, censor=False):
         """
         Display the order book with a specified depth.
         :param depth: Depth of the order book (N price tiers of data) (default: -1 for full order book)
+        :param censor: If True, censor user IDs
         :return: JSON string of the order book
         """
         bids = []
@@ -254,14 +255,16 @@ class OrderBook:
         # Get the best (depth) bid prices
         for price, orders in reversed(self.bids.items()):
             for order in orders:
-                bids.append({'ID': order.id, 'User': order.user, 'Quantity': order.quantity, 'Price': price})
+                user = order.user[:3] + '***' + order.user[-3:] if censor else order.user
+                bids.append({'ID': order.id, 'User': user, 'Quantity': order.quantity, 'Price': price})
             if 0 < depth <= len(bids):
                 break
 
         # Get the best (depth) ask prices
         for price, orders in self.asks.items():
             for order in orders:
-                asks.append({'ID': order.id, 'User': order.user, 'Quantity': order.quantity, 'Price': price})
+                user = order.user[:3] + '***' + order.user[-3:] if censor else order.user
+                asks.append({'ID': order.id, 'User': user, 'Quantity': order.quantity, 'Price': price})
             if 0 < depth <= len(asks):
                 break
 
@@ -296,26 +299,3 @@ class OrderBook:
             self.add_order(order)
 
         return self, max_id
-
-
-def __str__(self):
-    """
-    Return a string representation of the order book.
-    """
-    bids_df = pd.DataFrame(columns=['ID', 'User', 'Quantity', 'Price'])
-    asks_df = pd.DataFrame(columns=['ID', 'User', 'Quantity', 'Price'])
-    for price, orders in self.bids.items():
-        for order in orders:
-            bids_df = pd.concat(
-                [bids_df, pd.DataFrame([{'ID': order.id, 'User': order.user, 'Quantity': order.quantity,
-                                         'Price': price}])], ignore_index=True)
-    for price, orders in self.asks.items():
-        for order in orders:
-            asks_df = pd.concat(
-                [asks_df, pd.DataFrame([{'ID': order.id, 'User': order.user, 'Quantity': order.quantity,
-                                         'Price': price}])], ignore_index=True)
-
-    # Concatenate bids and asks DataFrames side by side
-    order_book_df = pd.concat([bids_df, asks_df], axis=1, keys=['Bids', 'Asks'])
-
-    return order_book_df.fillna('').to_string(index=False)

@@ -25,6 +25,7 @@ class SyntheticLiquidityProvider(AdminTrader, ABC):
         :param volume: Total volume to allocate for generating liquidity
         """
         super().__init__("liquidity_generator", target, config)
+        self.register(0)
         self.initialize_liquidity_engine(budget, volume)
         self.products = config["PRODUCTS"]
 
@@ -63,7 +64,7 @@ class SyntheticLiquidityProvider(AdminTrader, ABC):
                         price = order_book["Bids"][0]["Price"]
                     else:
                         continue  # Skip this iteration if both Bids and Asks are empty
-                self.delete_dispensable_orders(product, price, 1, 30)
+                self.delete_dispensable_orders(product, price, 5, 60)
                 price = price + random.uniform(-0.5, 0.5)  # Add some noise to the price
                 quantity = self.compute_quantity(product, side, price)
                 if side == "sell":

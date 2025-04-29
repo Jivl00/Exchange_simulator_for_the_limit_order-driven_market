@@ -2,12 +2,6 @@ import asyncio
 import os
 import sqlite3
 import sys
-from itertools import islice
-
-from sortedcontainers import SortedDict
-
-sys.path.append(os.path.join(os.path.dirname(__file__), '../..'))
-sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 import glob
 import signal
 import traceback
@@ -22,6 +16,11 @@ import colorlog
 import time
 import uuid
 import argparse
+from itertools import islice
+from sortedcontainers import SortedDict
+
+sys.path.append(os.path.join(os.path.dirname(__file__), '../..'))
+sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 
 from src.order_book.product_manager import TradingProductManager
 from src.server.user_manager import UserManager
@@ -99,7 +98,6 @@ class MsgHandler(tornado.web.RequestHandler):
     def handle_msg(self):
         """
         Handles requests from the client.
-        :return: None
         """
         try:
             message = json.loads(self.request.body)
@@ -170,13 +168,13 @@ class TradingHandler(MsgHandler):
         """
         Registers a new user.
         :param message: client message with user budget
-        :return: unique user ID
+        :return: encoded response with user ID
         """
         user_ID = user_manager.user_name_exists(message["user"])
         if user_ID:
             return protocol.encode({"user": user_ID, "msg_type": "RegisterResponse"})  # Return existing user ID
         if user_manager.user_exists(message["user"]):
-            return protocol.encode({"user": message["user"], "msg_type": "RegisterResponse"}) # Return existing user ID
+            return protocol.encode({"user": message["user"], "msg_type": "RegisterResponse"})  # Return existing user ID
 
         # Check if the user is in the database
         cursor.execute("SELECT * FROM users WHERE email=?", (message["user"],))
@@ -192,7 +190,7 @@ class TradingHandler(MsgHandler):
         """
         Initializes the liquidity engine.
         :param message: client message with user budget
-        :return: unique user ID
+        :return: encoded response with user balance
         """
         user = message["user"]
         budget = message["budget"]
@@ -211,7 +209,7 @@ class TradingHandler(MsgHandler):
         Tries to match an order with the existing orders in the order book,
         remaining quantity is added to the order book.
         :param message: client message with order details (user, side, quantity, price)
-        :return: server response
+        :return: encoded response with order ID and status
         """
         global ID
         product = message["product"]
@@ -224,7 +222,7 @@ class TradingHandler(MsgHandler):
         if round(message["order"]["quantity"]) <= 0 or round(message["order"]["price"], 2) <= 0:
             return protocol.encode({"order_id": -1, "status": False, "msg_type": "ExecutionReport"})
         # Check extreme values
-        max_int = 2**31-1
+        max_int = 2 ** 31 - 1
         if message["order"]["quantity"] > max_int - 1 or message["order"]["price"] > max_int - 1:
             return protocol.encode({"order_id": -1, "status": False, "msg_type": "ExecutionReport"})
 
@@ -265,7 +263,7 @@ class TradingHandler(MsgHandler):
 
             # Broadcast the changed order book to all clients
             broadcast_response = protocol.encode(
-                {"order_book": product_manager.get_order_book(product, False).jsonify_order_book(),
+                {"order_book": product_manager.get_order_book(product, False).jsonify_order_book(censor=True),
                  "product": product, "msg_type": "MarketDataSnapshot"})
             asyncio.ensure_future(WebSocketHandler.broadcast(broadcast_response))
         return response
@@ -275,7 +273,7 @@ class TradingHandler(MsgHandler):
         """
         Deletes an order from the order book.
         :param message: client message with order ID
-        :return: server response
+        :return: encoded response with order ID and status
         """
         product = message["product"]
         if not product_exists(product):
@@ -291,7 +289,7 @@ class TradingHandler(MsgHandler):
 
         # Broadcast the order book to all clients
         broadcast_response = protocol.encode(
-            {"order_book": product_manager.get_order_book(product, False).jsonify_order_book(),
+            {"order_book": product_manager.get_order_book(product, False).jsonify_order_book(censor=True),
              "product": product, "msg_type": "MarketDataSnapshot"})
         asyncio.ensure_future(WebSocketHandler.broadcast(broadcast_response))
         return protocol.encode({"order_id": order_id, "status": True, "msg_type": "ExecutionReportCancel"})
@@ -301,7 +299,7 @@ class TradingHandler(MsgHandler):
         """
         Modifies an order's quantity - only decrease is allowed.
         :param message: client message with order ID and new quantity
-        :return: server response
+        :return: encoded response with order ID and status
         """
         product = message["product"]
         if not product_exists(product):
@@ -326,7 +324,6 @@ class TradingHandler(MsgHandler):
     def post(self):
         """
         Handles POST requests from the client.
-        :return: None
         """
         self.handle_msg()
 
@@ -337,7 +334,7 @@ class QuoteHandler(MsgHandler):
         """
         Returns the status of an order.
         :param message: client message with order ID
-        :return: server response
+        :return: encoded response with order details
         """
         product = message["product"]
         if not product_exists(product):
@@ -353,7 +350,7 @@ class QuoteHandler(MsgHandler):
         """
         Returns the order book.
         :param message: client message with product name
-        :return: server response
+        :return: encoded response with order book data and product name
         """
         product = message["product"]
         depth = message.get("depth", -1)
@@ -365,7 +362,7 @@ class QuoteHandler(MsgHandler):
             order_book.bids = SortedDict(islice(reversed(order_book.bids.items()), depth))
             order_book.asks = SortedDict(islice(order_book.asks.items(), depth))
 
-        order_book_data = order_book.jsonify_order_book()
+        order_book_data = order_book.jsonify_order_book(censor=True)
         return protocol.encode({"order_book": order_book_data, "product": product, "msg_type": "MarketDataSnapshot"})
 
     @staticmethod
@@ -373,7 +370,7 @@ class QuoteHandler(MsgHandler):
         """
         Returns the orders of a user.
         :param message: client message with user ID
-        :return: server response
+        :return: encoded response with user orders
         """
         product = message["product"]
         if not product_exists(product):
@@ -389,19 +386,22 @@ class QuoteHandler(MsgHandler):
         """
         Returns records of the balance of a user.
         :param message: client message with user ID
-        :return: server response
+        :return: encoded response with user balance
         """
         cls.update_user_post_buy_budget(message["user"])
         cls.update_user_post_sell_volume(message["user"], message["product"])
         product = message["product"]
         if not product_exists(product):
             return protocol.encode({"user_balance": None, "msg_type": "UserBalance"})
+
+        # Uncomment the following lines if you want to include historical balances
         # historical_books = product_manager.historical_order_books[product]
         # user_balances = [
         #     {**book_data["UserBalance"][message["user"]], 'timestamp': book_data['Timestamp']}
         #     for book in historical_books
         #     if (book_data := json.loads(book)) and message["user"] in book_data["UserBalance"]
         # ]
+
         # Add current balance
         user_balance = product_manager.get_order_book(product, False).user_balance[message["user"]]
         # user_balances[-1]['timestamp'] = time.time_ns()
@@ -416,7 +416,7 @@ class QuoteHandler(MsgHandler):
         """
         Returns the historical report of the trading session.
         :param message: client message with product name
-        :return: server response
+        :return: encoded response with historical order books
         """
         product = message["product"]
         if not product_exists(product):
@@ -437,7 +437,6 @@ class QuoteHandler(MsgHandler):
     def get(self):
         """
         Handles GET requests from the client.
-        :return: None
         """
         self.handle_msg()
 
@@ -480,7 +479,7 @@ class WebSocketHandler(tornado.websocket.WebSocketHandler):
         closed_clients = set()
 
         async with cls.clients_lock:
-            for client in list(cls.clients):
+            for client in list(cls.clients):  # Use list to avoid modifying the set during iteration
                 if not client.ws_connection or client.ws_connection.is_closing():
                     closed_clients.add(client)
                     continue
@@ -500,8 +499,12 @@ class WebSocketHandler(tornado.websocket.WebSocketHandler):
 
 
 def make_app():
+    """
+    Creates the Tornado web application with the defined URL handlers.
+    :return: Tornado web application instance
+    """
     return tornado.web.Application([
-        (r"/", MainHandler),
+        (r"/", MainHandler),  # Main page - not used for trading
         (f"/{config['TRADING_SESSION']}", TradingHandler),
         (f"/{config['QUOTE_SESSION']}", QuoteHandler),
         (r"/websocket", WebSocketHandler),
@@ -562,7 +565,12 @@ def shutdown_server(server):
         :param signum: Signal number
         :param frame: Current stack frame
         """
+
         def shutdown():
+            """
+            Shuts down the server and saves the data.
+            """
+
             print("Shutting down server...")
             save_data()
 

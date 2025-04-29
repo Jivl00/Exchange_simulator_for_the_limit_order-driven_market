@@ -254,7 +254,7 @@ class Trader (Subscriber, ABC):
         :param product: Product name
         :param new_price: New price (or None)
         :param new_quantity: New quantity (or None)
-        :return: Order ID if not fully filled, None otherwise
+        :return: Order ID and status (True if successful, None if fully filled, False otherwise)
         """
         order = self.order_stats(ID, product)
         if order is None:
@@ -308,10 +308,15 @@ class Trader (Subscriber, ABC):
     def user_balance(self, product, verbose=True):
         """
         Returns the user's balance for a specific product.
-        Last element in the list is current balance and volume - therefore no timestamp is needed.
+        {'current_balance': {'balance': 0, 'volume': 0, 'post_sell_volume': 0}, 'budget': 10000, 'post_buy_budget': 10000}
         :param product: Product name
         :param verbose: If True, print the user's balance
-        :return: array with user's balance if successful, None otherwise
+        :return: Dictionary with user balance data with keys 'current_balance', 'budget', 'post_buy_budget'
+        - current_balance['balance']: Current balance - flat income
+        - current_balance['volume']: Current owned volume
+        - current_balance['post_sell_volume']: Current owned volume if all sell orders are executed
+        - budget: Initial budget - fees
+        - post_buy_budget: Budget after all buy orders are executed
         """
         data = {"product": product, "msg_type": "UserBalanceRequest"}
         message = self.PROTOCOL.encode(data)
@@ -360,7 +365,6 @@ class Trader (Subscriber, ABC):
         :param order_book_data: JSON with order book data
         :param aggregated: If True, display aggregated order book
         :param product: Product name
-        :return: None
         """
         if product is not None:
             print(f"Order book for {product}:")
@@ -400,7 +404,7 @@ class Trader (Subscriber, ABC):
         :param side: Side (buy or sell)
         :param price: Price
         :param ratio: Ratio of the budget to use
-        :return: Quantity
+        :return: Optimal quantity to trade
         """
         user_balance = self.user_balance(product, verbose=False)
         order_book_data = self.order_book_request(product)
@@ -484,6 +488,5 @@ class AdminTrader(Trader, ABC):
             return None
         response["msg_type"] = "UserBalance"
         data = self.PROTOCOL.decode(response)
-        print(f"User balance for market maker: {data['user_balance']}")
         return data["user_balance"]
 

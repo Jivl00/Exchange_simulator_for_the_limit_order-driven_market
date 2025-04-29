@@ -1,5 +1,8 @@
 
 class IProtocol:
+    """
+    Interface for Protocols to encode and decode data to/from byte buffers.
+    """
     def __init__(self):
         pass
 
