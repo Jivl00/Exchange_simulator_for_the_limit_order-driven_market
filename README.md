@@ -99,3 +99,6 @@ Use it to:
 cd tests
 python -m unittest tests.py
 ```
+
+### 📝 Documentation
+- For more information on the web interface and algorithmic trading, refer to the [trading maual](docs/Trading_manual.pdf).
