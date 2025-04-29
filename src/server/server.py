@@ -446,7 +446,7 @@ class WebSocketHandler(tornado.websocket.WebSocketHandler):
     Websocket handler for message exchange between the server and the client.
     """
     clients = set()
-    clients_lock = asyncio.Lock()  # Lock for thread-safe access
+    clients_lock = None  # Lock for thread-safe access
 
     def open(self):
         """
@@ -476,6 +476,9 @@ class WebSocketHandler(tornado.websocket.WebSocketHandler):
         :param message: message to broadcast
         """
         message_data = {"message": message.decode()}
+        if cls.clients_lock is None:
+            cls.clients_lock = asyncio.Lock()
+
         closed_clients = set()
 
         async with cls.clients_lock:
