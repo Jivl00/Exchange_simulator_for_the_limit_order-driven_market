@@ -447,19 +447,20 @@ class WebSocketHandler(tornado.websocket.WebSocketHandler):
     Websocket handler for message exchange between the server and the client.
     """
     clients = set()
+    clients_lock = asyncio.Lock()  # Lock for thread-safe access
 
     def open(self):
         """
         Handles new WebSocket connections - adds the client to the subscribed clients.
         """
-        self.clients.add(self)
+        self.__class__.clients.add(self)
         logging.info("New WebSocket connection")
 
     def on_close(self):
         """
         Handles WebSocket connection close - removes the client from the subscribed clients.
         """
-        self.clients.remove(self)
+        self.__class__.clients.discard(self)
         logging.info("WebSocket connection closed")
 
     def on_message(self, message):
@@ -475,20 +476,27 @@ class WebSocketHandler(tornado.websocket.WebSocketHandler):
         Broadcasts a message to all subscribed clients.
         :param message: message to broadcast
         """
-        message = {"message": message.decode()}
+        message_data = {"message": message.decode()}
         closed_clients = set()
-        for client in list(cls.clients):
-            try:
-                await client.write_message(message)
-            except tornado.websocket.WebSocketClosedError:
-                logging.error("Error broadcasting message because of closed connection")
-                closed_clients.add(client)
-            except tornado.iostream.StreamClosedError:
-                logging.error("Error broadcasting message because of closed stream")
-                closed_clients.add(client)
-        for client in closed_clients:
-            cls.clients.remove(client)
-            logging.info("WebSocket connection closed during broadcast")
+
+        async with cls.clients_lock:
+            for client in list(cls.clients):
+                if not client.ws_connection or client.ws_connection.is_closing():
+                    closed_clients.add(client)
+                    continue
+                try:
+                    await client.write_message(message_data)
+                except tornado.websocket.WebSocketClosedError:
+                    logging.error("WebSocketClosedError during broadcast")
+                    closed_clients.add(client)
+                except tornado.iostream.StreamClosedError:
+                    logging.error("StreamClosedError during broadcast")
+                    closed_clients.add(client)
+
+            # Remove all closed clients after the loop
+            for client in closed_clients:
+                cls.clients.discard(client)
+                logging.info("Removed closed client after failed broadcast")
 
 
 def make_app():
@@ -573,6 +581,9 @@ def shutdown_server(server):
 
 
 if __name__ == "__main__":
+    if sys.platform == "win32":
+        asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
+
     parser = argparse.ArgumentParser(description="Trading server")
     parser.add_argument('-l', '--load', action='store_true', help="Load the server data from the last checkpoint")
     args = parser.parse_args()
