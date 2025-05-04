@@ -18,7 +18,9 @@ logger = logging.getLogger(__name__)
 """
 For the tests to run correctly, the INITIAL_BUDGET set in the server.py must be 10000
 """
-python_path = "C:\\Users\\vladka\\PycharmProjects\\pythonProject\\venv\\Scripts\\python.exe"
+
+# IMPORTANT: Ensure the path to the Python executable is correct
+python_path = "path/to/python.exe"  # Update this to the correct path for your environment
 
 class TestAdminTrader(AdminTrader):
     def receive_market_data(self, data):

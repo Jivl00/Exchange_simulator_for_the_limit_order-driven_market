@@ -123,6 +123,6 @@ class RegressionTrader(AlgorithmicTrader):
 
 if __name__ == "__main__":
     config = json.load(open("../config/server_config.json"))
-    r_trader = RegressionTrader("lr_trader", "server", config, model_type="random_forest")
+    r_trader = RegressionTrader("random_forest_trader", "server", config, model_type="random_forest")
     r_trader.register(10000)
     r_trader.start_subscribe()

@@ -135,6 +135,6 @@ class MomentumTrader(AlgorithmicTrader):
 
 if __name__ == "__main__":
     config = json.load(open("../config/server_config.json"))
-    momentum_trader = MomentumTrader("momentum_trader", "server", config, "percentage_change")
+    momentum_trader = MomentumTrader("momentum_trader_percentage_change", "server", config, "percentage_change")
     momentum_trader.register(10000)
     momentum_trader.start_subscribe()
