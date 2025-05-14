@@ -103,3 +103,5 @@ python -m unittest tests.py
 ### 📝 Documentation
 - For more information on the web interface and algorithmic trading, refer to the [trading maual](docs/Trading_manual.pdf).
 - Official thesis document detailing the design, implementation, and evaluation of the exchange simulator: [Thesis](docs/dp_2024_25_KIMLOVÁ_Vladimíra.pdf).
+- Official thesis poster: [Poster](docs/DP_poster.pdf).
+- Documentation of the visualization module: [Visualization Documentation](docs/VI.pdf).
